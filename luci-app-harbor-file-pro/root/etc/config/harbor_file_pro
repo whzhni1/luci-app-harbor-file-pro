@@ -1,4 +1,4 @@
-​config harbor_file_pro 'main'
+config harbor_file_pro 'main'
 	option view_mode '1'
 	option allow_system_operations '0'
 	option show_hidden_files '0'
@@ -9,4 +9,3 @@
 	option restore_last_directory '1'
 	option show_line_numbers '1'
 	option last_directory ''
-
