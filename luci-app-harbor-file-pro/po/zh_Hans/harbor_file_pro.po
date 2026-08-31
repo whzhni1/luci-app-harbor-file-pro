@@ -834,7 +834,7 @@ msgid "Show Linux hidden files and folders whose names start with a dot."
 msgstr "显示名称以点（.）开头的 Linux 隐藏文件和文件夹。"
 
 msgid "Show cached image thumbnails in icon and tile views. Thumbnails only support image folders. After enabling this option, you can generate thumbnails in image folders."
-msgstr "在图标和瓷砖视图中显示缓存的图片缩略图。缩略图仅支持图片文件夹，启用后可在图片文件夹中生成缩略图。"
+msgstr "在图标和平铺视图中显示缓存的图片缩略图。缩略图仅支持图片文件夹，启用后可在图片文件夹中生成缩略图。"
 
 msgid "Show hidden files"
 msgstr "显示隐藏文件"
@@ -981,7 +981,7 @@ msgid "Thumbnails"
 msgstr "缩略图"
 
 msgid "Tiles"
-msgstr "瓷砖"
+msgstr "平铺"
 
 msgid "Transfer failed"
 msgstr "传输失败"
