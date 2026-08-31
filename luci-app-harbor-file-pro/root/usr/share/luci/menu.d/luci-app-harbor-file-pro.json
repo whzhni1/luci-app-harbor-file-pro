@@ -1,0 +1,550 @@
+{
+	"admin/fwx_harbor_file_pro": {
+		"title": "Harbor File Pro",
+		"order": 16,
+		"action": {
+			"type": "template",
+			"path": "harbor_file_pro/index"
+		},
+		"depends": {
+			"acl": [
+				"luci-app-harbor-file-pro"
+			],
+			"fs": {
+				"/etc/fwx_release": "file"
+			}
+		}
+	},
+	"admin/system/harbor_file_pro": {
+		"title": "Harbor File Pro",
+		"order": 90,
+		"action": {
+			"type": "template",
+			"path": "harbor_file_pro/index"
+		},
+		"depends": {
+			"acl": [
+				"luci-app-harbor-file-pro"
+			],
+			"fs": {
+				"/etc/fwx_release": "absent"
+			}
+		}
+	},
+	"admin/harbor_pro/navigation": {
+		"action": {
+			"type": "function",
+			"module": "harborpro.api",
+			"function": "api_navigation"
+		},
+		"depends": {
+			"acl": [
+				"luci-app-harbor-file-pro"
+			]
+		}
+	},
+	"admin/harbor_pro/list": {
+		"action": {
+			"type": "function",
+			"module": "harborpro.api",
+			"function": "api_list"
+		},
+		"depends": {
+			"acl": [
+				"luci-app-harbor-file-pro"
+			]
+		}
+	},
+	"admin/harbor_pro/create_directory": {
+		"action": {
+			"type": "function",
+			"module": "harborpro.api",
+			"function": "api_create_directory"
+		},
+		"depends": {
+			"acl": [
+				"luci-app-harbor-file-pro"
+			]
+		}
+	},
+	"admin/harbor_pro/create_file": {
+		"action": {
+			"type": "function",
+			"module": "harborpro.api",
+			"function": "api_create_file"
+		},
+		"depends": {
+			"acl": [
+				"luci-app-harbor-file-pro"
+			]
+		}
+	},
+	"admin/harbor_pro/rename": {
+		"action": {
+			"type": "function",
+			"module": "harborpro.api",
+			"function": "api_rename"
+		},
+		"depends": {
+			"acl": [
+				"luci-app-harbor-file-pro"
+			]
+		}
+	},
+	"admin/harbor_pro/delete": {
+		"action": {
+			"type": "function",
+			"module": "harborpro.api",
+			"function": "api_delete"
+		},
+		"depends": {
+			"acl": [
+				"luci-app-harbor-file-pro"
+			]
+		}
+	},
+	"admin/harbor_pro/copy": {
+		"action": {
+			"type": "function",
+			"module": "harborpro.api",
+			"function": "api_copy"
+		},
+		"depends": {
+			"acl": [
+				"luci-app-harbor-file-pro"
+			]
+		}
+	},
+	"admin/harbor_pro/move": {
+		"action": {
+			"type": "function",
+			"module": "harborpro.api",
+			"function": "api_move"
+		},
+		"depends": {
+			"acl": [
+				"luci-app-harbor-file-pro"
+			]
+		}
+	},
+	"admin/harbor_pro/batch_copy": {
+		"action": {
+			"type": "function",
+			"module": "harborpro.api",
+			"function": "api_batch_copy"
+		},
+		"depends": {
+			"acl": [
+				"luci-app-harbor-file-pro"
+			]
+		}
+	},
+	"admin/harbor_pro/batch_move": {
+		"action": {
+			"type": "function",
+			"module": "harborpro.api",
+			"function": "api_batch_move"
+		},
+		"depends": {
+			"acl": [
+				"luci-app-harbor-file-pro"
+			]
+		}
+	},
+	"admin/harbor_pro/batch_delete": {
+		"action": {
+			"type": "function",
+			"module": "harborpro.api",
+			"function": "api_batch_delete"
+		},
+		"depends": {
+			"acl": [
+				"luci-app-harbor-file-pro"
+			]
+		}
+	},
+	"admin/harbor_pro/batch_check": {
+		"action": {
+			"type": "function",
+			"module": "harborpro.api",
+			"function": "api_batch_check"
+		},
+		"depends": {
+			"acl": [
+				"luci-app-harbor-file-pro"
+			]
+		}
+	},
+	"admin/harbor_pro/chmod": {
+		"action": {
+			"type": "function",
+			"module": "harborpro.api",
+			"function": "api_chmod"
+		},
+		"depends": {
+			"acl": [
+				"luci-app-harbor-file-pro"
+			]
+		}
+	},
+	"admin/harbor_pro/detect_type": {
+		"action": {
+			"type": "function",
+			"module": "harborpro.api",
+			"function": "api_detect_type"
+		},
+		"depends": {
+			"acl": [
+				"luci-app-harbor-file-pro"
+			]
+		}
+	},
+	"admin/harbor_pro/read_text": {
+		"action": {
+			"type": "function",
+			"module": "harborpro.api",
+			"function": "api_read_text"
+		},
+		"depends": {
+			"acl": [
+				"luci-app-harbor-file-pro"
+			]
+		}
+	},
+	"admin/harbor_pro/save_text": {
+		"action": {
+			"type": "function",
+			"module": "harborpro.api",
+			"function": "api_save_text"
+		},
+		"depends": {
+			"acl": [
+				"luci-app-harbor-file-pro"
+			]
+		}
+	},
+	"admin/harbor_pro/upload_check": {
+		"action": {
+			"type": "function",
+			"module": "harborpro.api",
+			"function": "api_upload_check"
+		},
+		"depends": {
+			"acl": [
+				"luci-app-harbor-file-pro"
+			]
+		}
+	},
+	"admin/harbor_pro/upload": {
+		"action": {
+			"type": "function",
+			"module": "harborpro.api",
+			"function": "api_upload"
+		},
+		"depends": {
+			"acl": [
+				"luci-app-harbor-file-pro"
+			]
+		}
+	},
+	"admin/harbor_pro/save_editor_upload": {
+		"action": {
+			"type": "function",
+			"module": "harborpro.api",
+			"function": "api_save_editor_upload"
+		},
+		"depends": {
+			"acl": [
+				"luci-app-harbor-file-pro"
+			]
+		}
+	},
+	"admin/harbor_pro/archive_create_start": {
+		"action": {
+			"type": "function",
+			"module": "harborpro.api",
+			"function": "api_archive_create_start"
+		},
+		"depends": {
+			"acl": [
+				"luci-app-harbor-file-pro"
+			]
+		}
+	},
+	"admin/harbor_pro/archive_extract_start": {
+		"action": {
+			"type": "function",
+			"module": "harborpro.api",
+			"function": "api_archive_extract_start"
+		},
+		"depends": {
+			"acl": [
+				"luci-app-harbor-file-pro"
+			]
+		}
+	},
+	"admin/harbor_pro/archive_status": {
+		"action": {
+			"type": "function",
+			"module": "harborpro.api",
+			"function": "api_archive_status"
+		},
+		"depends": {
+			"acl": [
+				"luci-app-harbor-file-pro"
+			]
+		}
+	},
+	"admin/harbor_pro/preferences": {
+		"action": {
+			"type": "function",
+			"module": "harborpro.api",
+			"function": "api_preferences"
+		},
+		"depends": {
+			"acl": [
+				"luci-app-harbor-file-pro"
+			]
+		}
+	},
+	"admin/harbor_pro/save_preferences": {
+		"action": {
+			"type": "function",
+			"module": "harborpro.api",
+			"function": "api_save_preferences"
+		},
+		"depends": {
+			"acl": [
+				"luci-app-harbor-file-pro"
+			]
+		}
+	},
+	"admin/harbor_pro/save_last_directory": {
+		"action": {
+			"type": "function",
+			"module": "harborpro.api",
+			"function": "api_save_last_directory"
+		},
+		"depends": {
+			"acl": [
+				"luci-app-harbor-file-pro"
+			]
+		}
+	},
+	"admin/harbor_pro/save_show_line_numbers": {
+		"action": {
+			"type": "function",
+			"module": "harborpro.api",
+			"function": "api_save_show_line_numbers"
+		},
+		"depends": {
+			"acl": [
+				"luci-app-harbor-file-pro"
+			]
+		}
+	},
+	"admin/harbor_pro/terminal_info": {
+		"action": {
+			"type": "function",
+			"module": "harborpro.api",
+			"function": "api_terminal_info"
+		},
+		"depends": {
+			"acl": [
+				"luci-app-harbor-file-pro"
+			]
+		}
+	},
+	"admin/harbor_pro/terminal_tool_install_start": {
+		"action": {
+			"type": "function",
+			"module": "harborpro.api",
+			"function": "api_terminal_tool_install_start"
+		},
+		"depends": {
+			"acl": [
+				"luci-app-harbor-file-pro"
+			]
+		}
+	},
+	"admin/harbor_pro/nginx_install_start": {
+		"action": {
+			"type": "function",
+			"module": "harborpro.api",
+			"function": "api_nginx_install_start"
+		},
+		"depends": {
+			"acl": [
+				"luci-app-harbor-file-pro"
+			]
+		}
+	},
+	"admin/harbor_pro/thumbnail_tool_install_start": {
+		"action": {
+			"type": "function",
+			"module": "harborpro.api",
+			"function": "api_thumbnail_tool_install_start"
+		},
+		"depends": {
+			"acl": [
+				"luci-app-harbor-file-pro"
+			]
+		}
+	},
+	"admin/harbor_pro/tool_install_start": {
+		"action": {
+			"type": "function",
+			"module": "harborpro.api",
+			"function": "api_tool_install_start"
+		},
+		"depends": {
+			"acl": [
+				"luci-app-harbor-file-pro"
+			]
+		}
+	},
+	"admin/harbor_pro/package_install_start": {
+		"action": {
+			"type": "function",
+			"module": "harborpro.api",
+			"function": "api_package_install_start"
+		},
+		"depends": {
+			"acl": [
+				"luci-app-harbor-file-pro"
+			]
+		}
+	},
+	"admin/harbor_pro/package_install_status": {
+		"action": {
+			"type": "function",
+			"module": "harborpro.api",
+			"function": "api_package_install_status"
+		},
+		"depends": {
+			"acl": [
+				"luci-app-harbor-file-pro"
+			]
+		}
+	},
+	"admin/harbor_pro/thumbnail_generate_start": {
+		"action": {
+			"type": "function",
+			"module": "harborpro.api",
+			"function": "api_thumbnail_generate_start"
+		},
+		"depends": {
+			"acl": [
+				"luci-app-harbor-file-pro"
+			]
+		}
+	},
+	"admin/harbor_pro/thumbnail_generate_status": {
+		"action": {
+			"type": "function",
+			"module": "harborpro.api",
+			"function": "api_thumbnail_generate_status"
+		},
+		"depends": {
+			"acl": [
+				"luci-app-harbor-file-pro"
+			]
+		}
+	},
+	"admin/harbor_pro/bookmark_save": {
+		"action": {
+			"type": "function",
+			"module": "harborpro.api",
+			"function": "api_bookmark_save"
+		},
+		"depends": {
+			"acl": [
+				"luci-app-harbor-file-pro"
+			]
+		}
+	},
+	"admin/harbor_pro/bookmark_delete": {
+		"action": {
+			"type": "function",
+			"module": "harborpro.api",
+			"function": "api_bookmark_delete"
+		},
+		"depends": {
+			"acl": [
+				"luci-app-harbor-file-pro"
+			]
+		}
+	},
+	"admin/harbor_pro/bookmark_move": {
+		"action": {
+			"type": "function",
+			"module": "harborpro.api",
+			"function": "api_bookmark_move"
+		},
+		"depends": {
+			"acl": [
+				"luci-app-harbor-file-pro"
+			]
+		}
+	},
+	"admin/harbor_pro/bookmark_folder_add": {
+		"action": {
+			"type": "function",
+			"module": "harborpro.api",
+			"function": "api_bookmark_folder_add"
+		},
+		"depends": {
+			"acl": [
+				"luci-app-harbor-file-pro"
+			]
+		}
+	},
+	"admin/harbor_pro/bookmark_folder_rename": {
+		"action": {
+			"type": "function",
+			"module": "harborpro.api",
+			"function": "api_bookmark_folder_rename"
+		},
+		"depends": {
+			"acl": [
+				"luci-app-harbor-file-pro"
+			]
+		}
+	},
+	"admin/harbor_pro/bookmark_folder_delete": {
+		"action": {
+			"type": "function",
+			"module": "harborpro.api",
+			"function": "api_bookmark_folder_delete"
+		},
+		"depends": {
+			"acl": [
+				"luci-app-harbor-file-pro"
+			]
+		}
+	},
+	"admin/harbor_pro/bookmark_folder_state": {
+		"action": {
+			"type": "function",
+			"module": "harborpro.api",
+			"function": "api_bookmark_folder_state"
+		},
+		"depends": {
+			"acl": [
+				"luci-app-harbor-file-pro"
+			]
+		}
+	},
+	"admin/harbor_pro/bookmark_folder_move": {
+		"action": {
+			"type": "function",
+			"module": "harborpro.api",
+			"function": "api_bookmark_folder_move"
+		},
+		"depends": {
+			"acl": [
+				"luci-app-harbor-file-pro"
+			]
+		}
+	}
+}

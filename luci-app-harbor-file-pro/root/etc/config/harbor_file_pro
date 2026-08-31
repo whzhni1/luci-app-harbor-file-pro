@@ -1,0 +1,12 @@
+​config harbor_file_pro 'main'
+	option view_mode '1'
+	option allow_system_operations '0'
+	option show_hidden_files '0'
+	option home_dir '/tmp/root'
+	option enable_thumbnails '1'
+	option editor_auto_indent '1'
+	option editor_auto_wrap '0'
+	option restore_last_directory '1'
+	option show_line_numbers '1'
+	option last_directory ''
+

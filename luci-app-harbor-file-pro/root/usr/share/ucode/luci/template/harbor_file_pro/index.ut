@@ -1,0 +1,2060 @@
+{% include('header') %}
+<link rel="stylesheet" href="{{ resource }}/harbor_file_pro/common.css">
+<link rel="stylesheet" href="{{ resource }}/harbor_file_pro/css/file-manager.css">
+<link rel="stylesheet" href="{{ resource }}/harbor_file_pro/css/window-manager.css">
+<link rel="stylesheet" href="{{ resource }}/harbor_file_pro/css/document-windows.css">
+<style>
+:root { --fm-icon-close: url('{{ resource }}/harbor_file_pro/icons/close.svg'); }
+</style>
+
+<script type="text/javascript" src="{{ resource }}/harbor_file_pro/harbor-io.js"></script>
+<script type="text/javascript" src="{{ resource }}/harbor_file_pro/hex-source.js"></script>
+<script type="text/javascript">
+window.HarborFile = {
+    init: function (config) {
+        this.api = config.api;
+        this.io = config.io;
+        this.sessionid = config.sessionid;
+        this.labels = config.labels;
+        this.resource = config.resource;
+        return this;
+    }
+};
+HarborFile.init({
+    io: '/cgi-bin/harbor-io-pro',
+    sessionid: '{{ dispatcher.authsession ?? "" }}',
+    api: {
+        navigation: '{{ dispatcher.build_url('admin', 'harbor_pro', 'navigation') }}',
+        terminal_info: '{{ dispatcher.build_url('admin', 'harbor_pro', 'terminal_info') }}',
+        terminal_tool_install_start: '{{ dispatcher.build_url('admin', 'harbor_pro', 'terminal_tool_install_start') }}',
+        preferences: '{{ dispatcher.build_url('admin', 'harbor_pro', 'preferences') }}',
+        save_preferences: '{{ dispatcher.build_url('admin', 'harbor_pro', 'save_preferences') }}',
+        nginx_install_start: '{{ dispatcher.build_url('admin', 'harbor_pro', 'nginx_install_start') }}',
+        list: '{{ dispatcher.build_url('admin', 'harbor_pro', 'list') }}',
+        read_text: '{{ dispatcher.build_url('admin', 'harbor_pro', 'read_text') }}',
+        save_text: '{{ dispatcher.build_url('admin', 'harbor_pro', 'save_text') }}',
+        save_editor_upload: '{{ dispatcher.build_url('admin', 'harbor_pro', 'save_editor_upload') }}',
+        thumbnail_generate_start: '{{ dispatcher.build_url('admin', 'harbor_pro', 'thumbnail_generate_start') }}',
+        thumbnail_generate_status: '{{ dispatcher.build_url('admin', 'harbor_pro', 'thumbnail_generate_status') }}',
+        thumbnail_tool_install_start: '{{ dispatcher.build_url('admin', 'harbor_pro', 'thumbnail_tool_install_start') }}',
+        upload_check: '{{ dispatcher.build_url('admin', 'harbor_pro', 'upload_check') }}',
+        upload: '{{ dispatcher.build_url('admin', 'harbor_pro', 'upload') }}',
+        create_directory: '{{ dispatcher.build_url('admin', 'harbor_pro', 'create_directory') }}',
+        create_file: '{{ dispatcher.build_url('admin', 'harbor_pro', 'create_file') }}',
+        rename: '{{ dispatcher.build_url('admin', 'harbor_pro', 'rename') }}',
+        delete_item: '{{ dispatcher.build_url('admin', 'harbor_pro', 'delete') }}',
+        copy: '{{ dispatcher.build_url('admin', 'harbor_pro', 'copy') }}',
+        move: '{{ dispatcher.build_url('admin', 'harbor_pro', 'move') }}',
+        batch_copy: '{{ dispatcher.build_url('admin', 'harbor_pro', 'batch_copy') }}',
+        batch_move: '{{ dispatcher.build_url('admin', 'harbor_pro', 'batch_move') }}',
+        batch_delete: '{{ dispatcher.build_url('admin', 'harbor_pro', 'batch_delete') }}',
+        archive_create_start: '{{ dispatcher.build_url('admin', 'harbor_pro', 'archive_create_start') }}',
+        archive_extract_start: '{{ dispatcher.build_url('admin', 'harbor_pro', 'archive_extract_start') }}',
+        archive_status: '{{ dispatcher.build_url('admin', 'harbor_pro', 'archive_status') }}',
+        tool_install_start: '{{ dispatcher.build_url('admin', 'harbor_pro', 'tool_install_start') }}',
+        package_install_start: '{{ dispatcher.build_url('admin', 'harbor_pro', 'package_install_start') }}',
+        package_install_status: '{{ dispatcher.build_url('admin', 'harbor_pro', 'package_install_status') }}',
+        chmod: '{{ dispatcher.build_url('admin', 'harbor_pro', 'chmod') }}',
+        batch_check: '{{ dispatcher.build_url('admin', 'harbor_pro', 'batch_check') }}',
+        detect_type: '{{ dispatcher.build_url('admin', 'harbor_pro', 'detect_type') }}',
+        save_last_directory: '{{ dispatcher.build_url('admin', 'harbor_pro', 'save_last_directory') }}',
+        save_show_line_numbers: '{{ dispatcher.build_url('admin', 'harbor_pro', 'save_show_line_numbers') }}',
+        bookmark_save: '{{ dispatcher.build_url('admin', 'harbor_pro', 'bookmark_save') }}',
+        bookmark_delete: '{{ dispatcher.build_url('admin', 'harbor_pro', 'bookmark_delete') }}',
+        bookmark_move: '{{ dispatcher.build_url('admin', 'harbor_pro', 'bookmark_move') }}',
+        bookmark_folder_add: '{{ dispatcher.build_url('admin', 'harbor_pro', 'bookmark_folder_add') }}',
+        bookmark_folder_rename: '{{ dispatcher.build_url('admin', 'harbor_pro', 'bookmark_folder_rename') }}',
+        bookmark_folder_delete: '{{ dispatcher.build_url('admin', 'harbor_pro', 'bookmark_folder_delete') }}',
+        bookmark_folder_state: '{{ dispatcher.build_url('admin', 'harbor_pro', 'bookmark_folder_state') }}',
+        bookmark_folder_move: '{{ dispatcher.build_url('admin', 'harbor_pro', 'bookmark_folder_move') }}'
+    },
+    labels: {
+        video_format_error: '{{ _('This video format or codec is not supported by the browser') }}',
+        video_no_range: '{{ _('Web server does not support Range requests and available memory is too small to play this video') }}',
+        quick_access: '{{ _('Quick access') }}',
+        favorites: '{{ _('Favorites') }}',
+        add_bookmark: '{{ _('Add bookmark') }}',
+        edit_bookmark: '{{ _('Edit bookmark') }}',
+        bookmark_name: '{{ _('Bookmark name') }}',
+        bookmark_path: '{{ _('Bookmark path') }}',
+        bookmark_saved: '{{ _('Bookmark saved') }}',
+        bookmark_updated: '{{ _('Bookmark updated') }}',
+        bookmark_removed: '{{ _('Bookmark removed') }}',
+        move_up: '{{ _('Move up') }}',
+        move_down: '{{ _('Move down') }}',
+        remove_bookmark: '{{ _('Remove bookmark') }}',
+        no_folder: '{{ _('No folder') }}',
+        new_folder: '{{ _('New folder') }}',
+        rename_folder: '{{ _('Rename folder') }}',
+        delete_folder: '{{ _('Delete folder') }}',
+        bookmarks_count: '{{ _('Bookmarks') }}',
+        browse: '{{ _('Browse') }}',
+        parent_directory: '{{ _('Parent directory') }}',
+        empty_directory: '{{ _('Empty directory') }}',
+        this_pc: '{{ _('This device') }}',
+        frequent_folders: '{{ _('Frequent folders') }}',
+        folders: '{{ _('Folders') }}',
+        drives: '{{ _('Storage space') }}',
+        folder: '{{ _('Folder') }}',
+        file: '{{ _('File') }}',
+        name: '{{ _('Name') }}',
+        path: '{{ _('Path') }}',
+        size: '{{ _('Size') }}',
+        type: '{{ _('Type') }}',
+        modified: '{{ _('Modified') }}',
+        permissions: '{{ _('Permissions') }}',
+        system_disk: '{{ _('System Disk') }}',
+        empty: '{{ _('This folder is empty') }}',
+        unavailable: '{{ _('Path is not available') }}',
+        request_failed: '{{ _('Request failed') }}',
+        unsupported: '{{ _('This file type cannot be opened') }}',
+        pdf_not_supported: '{{ _('This browser does not support PDF preview') }}',
+        download_file: '{{ _('Download file') }}',
+        download_failed: '{{ _('Download failed') }}',
+        edit_text: '{{ _('Edit text') }}',
+        open_binary: '{{ _('Open hexadecimal') }}',
+        binary_viewer: '{{ _('Binary viewer') }}',
+        binary_offset: '{{ _('Offset') }}',
+        binary_hex: '{{ _('Hex') }}',
+        binary_ascii: '{{ _('ASCII') }}',
+        binary_read: '{{ _('Read') }}',
+        binary_start: '{{ _('Start position') }}',
+        binary_length: '{{ _('Read size') }}',
+        binary_load: '{{ _('Confirm range') }}',
+        invalid_range: '{{ _('Enter a valid range. Read size must be 1-16 KB') }}',
+        truncated: '{{ _('The file is too large. Only the first part is shown') }}',
+        bytes: '{{ _('bytes') }}',
+        save_success: '{{ _('Save successful') }}',
+        save_failed: '{{ _('Save failed') }}',
+        readonly_large: '{{ _('The file is too large and can only be previewed in read-only mode') }}',
+        readonly_system: '{{ _('System folder operations are disabled. This file cannot be saved') }}',
+        discard_text_changes: '{{ _('This content has been modified. Discard unsaved changes?') }}',
+        text_size: '{{ _('Size') }}',
+        text_lines: '{{ _('Lines') }}',
+        text_line: '{{ _('Line') }}',
+        text_column: '{{ _('Column') }}',
+        upload_to: '{{ _('Upload to') }}',
+        uploading: '{{ _('Uploading') }}',
+        upload_speed: '{{ _('Upload speed') }}',
+        upload_complete: '{{ _('Upload complete') }}',
+        upload_failed: '{{ _('Upload failed') }}',
+        upload_busy: '{{ _('An upload is already in progress') }}',
+        no_files: '{{ _('No files were selected') }}',
+        folder_not_supported: '{{ _('Folder upload is not supported') }}',
+        insufficient_space: '{{ _('Not enough free space') }}',
+        space_less_than_50mb: '{{ _('Available space is less than 5% of the current partition, operation is not allowed') }}',
+        blocked_conflict: '{{ _('A directory or special file already uses this name') }}',
+        select_upload_target: '{{ _('Drop files on a writable directory') }}',
+        new_folder: '{{ _('New folder') }}',
+        new_file: '{{ _('New file') }}',
+        folder_name: '{{ _('Folder name') }}',
+        file_name: '{{ _('File name') }}',
+        rename: '{{ _('Rename') }}',
+        new_name: '{{ _('New name') }}',
+        create: '{{ _('Create') }}',
+        save: '{{ _('Save') }}',
+        error: '{{ _('Error') }}',
+        warning: '{{ _('Warning') }}',
+        success: '{{ _('Success') }}',
+        notice: '{{ _('Notice') }}',
+        confirm: '{{ _('Confirm') }}',
+        upload: '{{ _('Upload') }}',
+        auto_indent: '{{ _('Auto indent') }}',
+        auto_indent_desc: '{{ _('Keep the indentation and indent the next line after an opening brace or parenthesis when editing code files.') }}',
+        auto_wrap: '{{ _('Auto wrap') }}',
+        auto_wrap_desc: '{{ _('Wrap long lines to fit the window in the text editor.') }}',
+        restore_last_directory: '{{ _('Restore last directory') }}',
+        restore_last_directory_desc: '{{ _('Reopen the last visited directory when Harbor File starts.') }}',
+        undo: '{{ _('Undo') }}',
+        redo: '{{ _('Redo') }}',
+        line_numbers: '{{ _('Line numbers') }}',
+        recover_unsaved: '{{ _('Unsaved changes from your last session were found for this file.') }}',
+        recover: '{{ _('Recover') }}',
+        discard_changes: '{{ _('Discard changes') }}',
+        invalid_name: '{{ _('Enter a valid name') }}',
+        folder_created: '{{ _('Folder created') }}',
+        file_created: '{{ _('File created') }}',
+        rename_complete: '{{ _('Rename complete') }}',
+        delete_complete: '{{ _('Delete complete') }}',
+        operation_failed: '{{ _('Operation failed') }}',
+        copy_action: '{{ _('Copy') }}',
+        cut_action: '{{ _('Cut') }}',
+        paste: '{{ _('Paste') }}',
+        copy_to: '{{ _('Copy to') }}',
+        move_to: '{{ _('Move to') }}',
+        move_item_confirm: '{{ _('Move this item to the selected folder?') }}',
+        move_selected_confirm: '{{ _('Move selected items to the selected folder?') }}',
+        copy_selected_confirm: '{{ _('Copy selected items to the selected folder?') }}',
+        move_item_same: '{{ _('Source and destination folders cannot be the same') }}',
+        copy_complete: '{{ _('Copy complete') }}',
+        move_complete: '{{ _('Move complete') }}',
+        compress: '{{ _('Compress') }}',
+        target_path: '{{ _('Target path') }}',
+        extract_overwrite_confirm: '{{ _('The target already exists, overwrite it?') }}',
+        extract: '{{ _('Extract') }}',
+        archive_format: '{{ _('Archive format') }}',
+        archive_name: '{{ _('Archive name') }}',
+        archive_operation: '{{ _('Archive operation') }}',
+        creating_archive: '{{ _('Creating archive') }}',
+        extracting_archive: '{{ _('Extracting archive') }}',
+        archive_created: '{{ _('Archive created successfully') }}',
+        archive_extracted: '{{ _('Archive extracted successfully') }}',
+        archive_failed: '{{ _('Archive operation failed') }}',
+        archive_overwrite_confirm: '{{ _('The target archive already exists, overwrite it?') }}',
+        archive_busy: '{{ _('Another archive task is already running') }}',
+        archive_task_not_found: '{{ _('Archive task not found') }}',
+        archive_command_missing: '{{ _('Archive command not found') }}',
+        archive_missing_tool_install: '{{ _('Missing %s tool, please install it from Software Center first') }}',
+        archive_tool_required: '{{ _('%s is not installed') }}',
+        install_tool: '{{ _('Install %s') }}',
+        unsupported_archive: '{{ _('Unsupported archive format') }}',
+        archive_same_directory_required: '{{ _('Archive sources must be in the same directory') }}',
+        archive_single_file_only: '{{ _('This archive format only supports one regular file') }}',
+        preparing_archive: '{{ _('Preparing archive') }}',
+        multiple_items: '{{ _('Multiple items') }}',
+        selected_items: '{{ _('Selected %d items') }}',
+        delete_item_confirm: '{{ _('Are you sure you want to permanently delete this item?') }}',
+        delete_selected_items: '{{ _('Delete selected items?') }}',
+        batch_stopped_at: '{{ _('Batch operation stopped at: %s') }}',
+        some_items_cannot_modify: '{{ _('Some items cannot be modified') }}',
+        copied_to_clipboard: '{{ _('Copied to clipboard') }}',
+        cut_to_clipboard: '{{ _('Cut to clipboard') }}',
+        clipboard_empty: '{{ _('Clipboard is empty') }}',
+        paste_complete: '{{ _('Paste complete') }}',
+        select_destination: '{{ _('Select destination folder') }}',
+        settings: '{{ _('Settings') }}',
+        default_view: '{{ _('Default view') }}',
+        home_dir: '{{ _('Home directory') }}',
+        home_dir_desc: '{{ _('Common folders are created under this directory and shown in Quick access.') }}',
+        system_folder_operations: '{{ _('System folder operations') }}',
+        show_hidden_files: '{{ _('Show hidden files') }}',
+        thumbnails: '{{ _('Thumbnails') }}',
+        thumbnails_desc: '{{ _('Show cached image thumbnails in icon and tile views. Thumbnails only support image folders. After enabling this option, you can generate thumbnails in image folders.') }}',
+        generate_thumbnails: '{{ _('Generate thumbnails') }}',
+        generating_thumbnails: '{{ _('Generating thumbnails') }}',
+        thumbnail_success: '{{ _('Thumbnail generation complete') }}',
+        thumbnail_failed: '{{ _('Thumbnail generation failed') }}',
+        thumbnail_busy: '{{ _('Another thumbnail generation task is already running') }}',
+        thumbnail_command_missing: '{{ _('GraphicsMagick command not found') }}',
+        thumbnail_tool_required: '{{ _('GraphicsMagick is required to generate thumbnails') }}',
+        install_graphicsmagick: '{{ _('Install GraphicsMagick') }}',
+        graphicsmagick_installed: '{{ _('GraphicsMagick is already installed') }}',
+        thumbnail_task_not_found: '{{ _('Thumbnail task not found') }}',
+        preparing_thumbnails: '{{ _('Preparing thumbnails') }}',
+        current_file: '{{ _('Current file') }}',
+        progress: '{{ _('Progress') }}',
+        generated: '{{ _('Generated') }}',
+        cached: '{{ _('Cached') }}',
+        failed: '{{ _('Failed') }}',
+        invalid_path: '{{ _('Enter a valid absolute path') }}',
+        disabled: '{{ _('Disabled') }}',
+        enabled: '{{ _('Enabled') }}',
+        settings_saved: '{{ _('Settings saved') }}',
+        checking: '{{ _('Checking') }}',
+        installed: '{{ _('Installed') }}',
+        not_installed: '{{ _('Not installed') }}',
+        unlimited: '{{ _('Unlimited') }}',
+        nginx_configuration: '{{ _('Nginx configuration') }}',
+        nginx_settings_saved: '{{ _('Nginx configuration saved') }}',
+        installing_nginx: '{{ _('Installing Nginx, please wait.') }}',
+        nginx_restart_countdown: '{{ _('Installing, please wait, %d seconds remaining.') }}',
+        nginx_install_failed: '{{ _('Nginx installation failed') }}',
+        web_server_settings_saved: '{{ _('Web service configuration saved') }}',
+        system_folder_blocked: '{{ _('System folder operations are disabled') }}',
+        uploaded: '{{ _('Uploaded') }}',
+        buffered: '{{ _('Buffered') }}',
+        buffering: '{{ _('Buffering') }}',
+        of: '{{ _('of') }}',
+        installer: '{{ _('Installer') }}',
+        install: '{{ _('Install') }}',
+        install_package: '{{ _('Install package') }}',
+        install_package_now: '{{ _('Install this package now?') }}',
+        installing_package: '{{ _('Installing package') }}',
+        install_success: '{{ _('Package installed successfully') }}',
+        install_success_with_warnings: '{{ _('Package installed with warnings') }}',
+        install_failed: '{{ _('Package installation failed') }}',
+        install_running: '{{ _('Installing package') }}',
+        install_busy: '{{ _('Another package installation is already running') }}',
+        command_not_found: '{{ _('Installer command not found') }}',
+        no_log_yet: '{{ _('No log yet') }}',
+        ipk_package: '{{ _('IPK Package') }}',
+        apk_package: '{{ _('APK Package') }}',
+        system_package: '{{ _('System package') }}',
+        package_task_not_found: '{{ _('Package install task not found') }}',
+        preparing_install: '{{ _('Preparing package install') }}',
+        checking_package_index: '{{ _('Checking package index') }}',
+        updating_package_index: '{{ _('Updating package index') }}',
+        package_index_update_failed: '{{ _('Package index update failed') }}',
+        install_unexpected_end: '{{ _('Install task ended unexpectedly') }}',
+        exit_code: '{{ _('Exit code') }}',
+        terminal: '{{ _('Terminal') }}',
+        connecting_terminal: '{{ _('Connecting to terminal') }}',
+        terminal_failed: '{{ _('Terminal connection failed') }}',
+        terminal_failed_hint: '{{ _('Connection failed, please check whether the ttyd service is running and the port is correct') }}',
+        terminal_https_hint: '{{ _('This LuCI page is served over HTTPS, so the terminal must also use HTTPS. Enable SSL in the ttyd configuration, or open the terminal in a new window over HTTP') }}',
+        terminal_https_cert_hint: '{{ _('The terminal uses a certificate the browser cannot verify (for example a self-signed certificate), so it is blocked inside this window. Open the terminal in a new window and accept the certificate, or install a trusted certificate for ttyd') }}',
+        terminal_current_path: '{{ _('Current path') }}',
+        terminal_service_url: '{{ _('Service address') }}',
+        terminal_service_missing: '{{ _('The ttyd service is not installed or not configured') }}',
+        install_terminal_tool: '{{ _('Install terminal plugin') }}',
+        open_terminal_external: '{{ _('Open terminal in a new window') }}',
+        web_service: '{{ _('Web service') }}',
+        file_conflict: '{{ _('File conflict') }}',
+        overwrite: '{{ _('Overwrite') }}', 
+        rename: '{{ _('Rename') }}',
+        skip: '{{ _('Skip') }}',
+        files: '{{ _('Files') }}',
+        already_exist: '{{ _('already exist') }}',
+        please_select_operation: '{{ _('Please select an operation') }}',
+        open_windows: '{{ _('Open windows') }}',
+        close: '{{ _('Close') }}',
+        close_window: '{{ _('Close') }}',
+        minimize_window: '{{ _('Minimize') }}',
+        maximize_window: '{{ _('Maximize') }}',
+        restore_window: '{{ _('Restore') }}',
+        window_title: '{{ _('Window') }}',
+        image_title: '{{ _('Image') }}',
+        pdf_title: '{{ _('PDF') }}',
+        video_title: '{{ _('Video') }}',
+        ascii_label: '{{ _('ASCII') }}',
+        nginx_name: '{{ _('Nginx') }}',
+        saving: '{{ _('Saving…') }}',
+        saving_progress: '{{ _('Saving ') }}',
+        unsaved: '{{ _('Unsaved') }}',
+        read_only: '{{ _('Read only') }}',
+        saved: '{{ _('Saved') }}',
+        search: '{{ _('Search') }}',
+        search_text: '{{ _('Search text') }}',
+        match_case: '{{ _('Match case') }}',
+        replace_with: '{{ _('Replace with') }}',
+        replace_all: '{{ _('Replace all') }}',
+        regular_expression: '{{ _('Regular expression') }}',
+        replace: '{{ _('Replace') }}',
+        reading_full_file: '{{ _('Reading full file…') }}',
+        hex_search_placeholder: '{{ _('Enter hex bytes, e.g. DE AD BE EF') }}',
+        hex_replace_placeholder: '{{ _('Replace hex value') }}',
+        hex_replace_length_mismatch: '{{ _('Hex replacement must match the match length') }}',
+        invalid_permissions: '{{ _('Invalid permissions') }}',
+        permissions_updated: '{{ _('Permissions updated') }}',
+        update_failed: '{{ _('Update failed') }}',
+        enter_absolute_path: '{{ _('Please enter an absolute path starting with /') }}'
+    },
+    resource: '{{ resource }}/harbor_file_pro/'
+});
+
+window.HarborFile.tr = function (msgid) {
+    var labels = (window.HarborFile && window.HarborFile.labels) || {};
+
+    
+    if (typeof window._ === 'function' && window._ !== window.HarborFile.tr) {
+        var translated = window._(msgid);
+        if (translated && translated !== msgid) {
+            return translated;
+        }
+    }
+
+    
+    if (labels[msgid] !== undefined && labels[msgid] !== null && labels[msgid] !== '') {
+        return labels[msgid];
+    }
+    var snake = String(msgid).toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+    if (labels[snake] !== undefined && labels[snake] !== null && labels[snake] !== '') {
+        return labels[snake];
+    }
+
+    
+    var alias = {
+        'ASCII': 'ascii_label',
+        'Image': 'image_title',
+        'PDF': 'pdf_title',
+        'Video': 'video_title',
+        'Nginx': 'nginx_name',
+        'Saving ': 'saving_progress',
+        'Enter hex bytes, e.g. DE AD BE EF': 'hex_search_placeholder',
+        'Replace hex value': 'hex_replace_placeholder',
+        'Hex replacement must match the match length': 'hex_replace_length_mismatch',
+        'Please enter an absolute path starting with /': 'enter_absolute_path'
+    };
+    if (alias[msgid] !== undefined && labels[alias[msgid]] !== undefined && labels[alias[msgid]] !== null && labels[alias[msgid]] !== '') {
+        return labels[alias[msgid]];
+    }
+
+    return msgid;
+};
+</script>
+
+<script src="{{ resource }}/harbor_file_pro/js/util.js"></script>
+<script src="{{ resource }}/harbor_file_pro/js/recovery.js"></script>
+<script src="{{ resource }}/harbor_file_pro/js/window-manager.js"></script>
+<script src="{{ resource }}/harbor_file_pro/js/document-windows.js"></script>
+<script src="{{ resource }}/harbor_file_pro/js/system-windows.js"></script>
+<script src="{{ resource }}/harbor_file_pro/js/file-operations.js"></script>
+
+<div class="file-manager">
+    <div class="fm-toolbar">
+        <button id="fm_back" class="fm-tool-button" type="button" title="{{ _('Back') }}" aria-label="{{ _('Back') }}">
+            <span class="fm-tool-image" style="--fm-icon:url('{{ resource }}/harbor_file_pro/icons/back.svg')" aria-hidden="true"></span>
+        </button>
+        <button id="fm_forward" class="fm-tool-button" type="button" title="{{ _('Forward') }}" aria-label="{{ _('Forward') }}">
+            <span class="fm-tool-image" style="--fm-icon:url('{{ resource }}/harbor_file_pro/icons/forward.svg')" aria-hidden="true"></span>
+        </button>
+        <button id="fm_up" class="fm-tool-button" type="button" title="{{ _('Up') }}" aria-label="{{ _('Up') }}">
+            <span class="fm-tool-image" style="--fm-icon:url('{{ resource }}/harbor_file_pro/icons/up.svg')" aria-hidden="true"></span>
+        </button>
+        <button id="fm_refresh" class="fm-tool-button" type="button" title="{{ _('Refresh') }}" aria-label="{{ _('Refresh') }}">
+            <span class="fm-tool-image" style="--fm-icon:url('{{ resource }}/harbor_file_pro/icons/refresh.svg')" aria-hidden="true"></span>
+        </button>
+        <button id="fm_view" class="fm-tool-button" type="button" title="{{ _('View') }}" aria-label="{{ _('View') }}">
+            <span class="fm-tool-image" style="--fm-icon:url('{{ resource }}/harbor_file_pro/icons/view.svg')" aria-hidden="true"></span>
+        </button>
+        <button id="fm_settings" class="fm-tool-button" type="button" title="{{ _('Settings') }}" aria-label="{{ _('Settings') }}">
+            <span class="fm-tool-image" style="--fm-icon:url('{{ resource }}/harbor_file_pro/icons/settings.svg')" aria-hidden="true"></span>
+        </button>
+        <button id="fm_about" class="fm-tool-button" type="button" title="{{ _('About') }}" aria-label="{{ _('About') }}">
+            <span class="fm-tool-image" style="--fm-icon:url('{{ resource }}/harbor_file_pro/icons/about.svg')" aria-hidden="true"></span>
+        </button>
+        <div id="fm_address" class="fm-address"></div>
+        <button id="fm_favorites" class="fm-tool-button fm-favorites-button" type="button" title="{{ _('Favorites') }}" aria-label="{{ _('Favorites') }}">&#9733;</button>
+    </div>
+
+    <div class="fm-layout">
+        <aside id="fm_sidebar" class="fm-sidebar"></aside>
+        <main id="fm_main" class="fm-main">
+            <div id="fm_status" class="fm-status"></div>
+            <div id="fm_upload_panel" class="fm-upload-panel">
+                <div class="fm-upload-heading">
+                    <img src="{{ resource }}/harbor_file_pro/icons/upload.svg" alt="">
+                    <div id="fm_upload_title" class="fm-upload-title">-</div>
+                    <div id="fm_upload_percent" class="fm-upload-percent">0%</div>
+                </div>
+                <div class="fm-upload-progress"><span id="fm_upload_progress"></span></div>
+                <div id="fm_upload_detail" class="fm-upload-detail">-</div>
+                <div id="fm_upload_bytes" class="fm-upload-bytes">-</div>
+                <div id="fm_upload_speed" class="fm-upload-speed">-</div>
+            </div>
+            <div id="fm_drag_overlay" class="fm-drag-overlay"></div>
+            <div id="fm_content" class="fm-content"></div>
+            <div class="fm-details">
+                <div class="fm-detail"><div class="fm-detail-label">{{ _('Name') }}</div><div id="fm_detail_name" class="fm-detail-value">-</div></div>
+                <div class="fm-detail"><div class="fm-detail-label">{{ _('Path') }}</div><div id="fm_detail_path" class="fm-detail-value">-</div></div>
+                <div class="fm-detail"><div class="fm-detail-label">{{ _('Type') }}</div><div id="fm_detail_type" class="fm-detail-value">-</div></div>
+                <div class="fm-detail"><div class="fm-detail-label">{{ _('Size') }}</div><div id="fm_detail_size" class="fm-detail-value">-</div></div>
+                <div class="fm-detail"><div class="fm-detail-label">{{ _('Permissions') }}</div><div id="fm_detail_mode" class="fm-detail-value">-</div></div>
+                <div class="fm-detail"><div class="fm-detail-label">{{ _('Modified') }}</div><div id="fm_detail_mtime" class="fm-detail-value">-</div></div>
+            </div>
+        </main>
+    </div>
+</div>
+
+<input id="fm_upload_input" type="file" multiple hidden style="display:none">
+
+    <div id="fm_fav_panel" class="fm-fav-panel"></div>
+
+<div id="fm_bookmark_menu" class="fm-context-menu">
+    <button id="fm_menu_bookmark_open" type="button"><span>{{ _('Open') }}</span></button>
+    <button id="fm_menu_bookmark_edit" type="button"><span>{{ _('Edit') }}</span></button>
+    <button id="fm_menu_bookmark_up" type="button"><span>{{ _('Move up') }}</span></button>
+    <button id="fm_menu_bookmark_down" type="button"><span>{{ _('Move down') }}</span></button>
+    <button id="fm_menu_bookmark_delete" type="button"><span>{{ _('Delete') }}</span></button>
+</div>
+
+<div id="fm_item_menu" class="fm-context-menu">
+    <button id="fm_menu_open" type="button">
+        <span class="fm-menu-image" style="--fm-icon:url('{{ resource }}/harbor_file_pro/icons/open.svg')" aria-hidden="true"></span>
+        <span>{{ _('Open') }}</span>
+    </button>
+    <button id="fm_menu_open_binary" type="button">
+        <span class="fm-menu-image" style="--fm-icon:url('{{ resource }}/harbor_file_pro/icons/binary.svg')" aria-hidden="true"></span>
+        <span>{{ _('Open hexadecimal') }}</span>
+    </button>
+    <button id="fm_menu_properties" type="button">
+        <span class="fm-menu-image" style="--fm-icon:url('{{ resource }}/harbor_file_pro/icons/properties.svg')" aria-hidden="true"></span>
+        <span>{{ _('Properties') }}</span>
+    </button>
+    <button id="fm_menu_terminal" type="button">
+        <span class="fm-menu-image" style="--fm-icon:url('{{ resource }}/harbor_file_pro/icons/terminal.svg')" aria-hidden="true"></span>
+        <span>{{ _('Terminal') }}</span>
+    </button>
+    <button id="fm_menu_download" type="button">
+        <span class="fm-menu-image" style="--fm-icon:url('{{ resource }}/harbor_file_pro/icons/download.svg')" aria-hidden="true"></span>
+        <span>{{ _('Download file') }}</span>
+    </button>
+    <button id="fm_menu_compress" type="button">
+        <span class="fm-menu-image" style="--fm-icon:url('{{ resource }}/harbor_file_pro/icons/archive.svg')" aria-hidden="true"></span>
+        <span>{{ _('Compress') }}</span>
+    </button>
+    <button id="fm_menu_extract" type="button">
+        <span class="fm-menu-image" style="--fm-icon:url('{{ resource }}/harbor_file_pro/icons/open.svg')" aria-hidden="true"></span>
+        <span>{{ _('Extract') }}</span>
+    </button>
+    <button id="fm_menu_copy" type="button">
+        <span class="fm-menu-image" style="--fm-icon:url('{{ resource }}/harbor_file_pro/icons/copy.svg')" aria-hidden="true"></span>
+        <span>{{ _('Copy') }}</span>
+    </button>
+    <button id="fm_menu_cut" type="button">
+        <span class="fm-menu-image" style="--fm-icon:url('{{ resource }}/harbor_file_pro/icons/cut.svg')" aria-hidden="true"></span>
+        <span>{{ _('Cut') }}</span>
+    </button>
+    <button id="fm_menu_paste" type="button">
+        <span class="fm-menu-image" style="--fm-icon:url('{{ resource }}/harbor_file_pro/icons/paste.svg')" aria-hidden="true"></span>
+        <span>{{ _('Paste') }}</span>
+    </button>
+    <button id="fm_menu_upload" type="button">
+        <span class="fm-menu-image" style="--fm-icon:url('{{ resource }}/harbor_file_pro/icons/upload.svg')" aria-hidden="true"></span>
+        <span>{{ _('Upload files') }}</span>
+    </button>
+    <button id="fm_menu_rename" type="button">
+        <span class="fm-menu-image" style="--fm-icon:url('{{ resource }}/harbor_file_pro/icons/rename.svg')" aria-hidden="true"></span>
+        <span>{{ _('Rename') }}</span>
+    </button>
+    <button id="fm_menu_copy_to" type="button">
+        <span class="fm-menu-image" style="--fm-icon:url('{{ resource }}/harbor_file_pro/icons/copy.svg')" aria-hidden="true"></span>
+        <span>{{ _('Copy to') }}</span>
+    </button>
+    <button id="fm_menu_move_to" type="button">
+        <span class="fm-menu-image" style="--fm-icon:url('{{ resource }}/harbor_file_pro/icons/move.svg')" aria-hidden="true"></span>
+        <span>{{ _('Move to') }}</span>
+    </button>
+    <button id="fm_menu_delete" type="button">
+        <span class="fm-menu-image" style="--fm-icon:url('{{ resource }}/harbor_file_pro/icons/delete.svg')" aria-hidden="true"></span>
+        <span>{{ _('Delete') }}</span>
+    </button>
+</div>
+
+    <div id="fm_view_menu" class="fm-context-menu">
+    <button type="button" data-view="large"><span>{{ _('Large icons') }}</span></button>
+    <button type="button" data-view="medium"><span>{{ _('Medium icons') }}</span></button>
+    <button type="button" data-view="small"><span>{{ _('Small icons') }}</span></button>
+    <button type="button" data-view="list"><span>{{ _('List') }}</span></button>
+    <button type="button" data-view="details"><span>{{ _('Details') }}</span></button>
+    <button type="button" data-view="tile"><span>{{ _('Tiles') }}</span></button>
+</div>
+
+    <div id="fm_blank_menu" class="fm-context-menu">
+    <button id="fm_menu_sort" class="has-submenu" type="button">
+        <span class="fm-menu-image placeholder" aria-hidden="true"></span>
+        <span>{{ _('Sort by') }}</span>
+    </button>
+    <button id="fm_menu_new_folder" type="button">
+        <span class="fm-menu-image" style="--fm-icon:url('{{ resource }}/harbor_file_pro/icons/new_folder.svg')" aria-hidden="true"></span>
+        <span>{{ _('New folder') }}</span>
+    </button>
+    <button id="fm_menu_new_file" type="button">
+        <span class="fm-menu-image" style="--fm-icon:url('{{ resource }}/harbor_file_pro/icons/new_file.svg')" aria-hidden="true"></span>
+        <span>{{ _('New file') }}</span>
+    </button>
+    <button id="fm_menu_paste_here" type="button">
+        <span class="fm-menu-image" style="--fm-icon:url('{{ resource }}/harbor_file_pro/icons/paste.svg')" aria-hidden="true"></span>
+        <span>{{ _('Paste') }}</span>
+    </button>
+    <button id="fm_menu_upload_here" type="button">
+        <span class="fm-menu-image" style="--fm-icon:url('{{ resource }}/harbor_file_pro/icons/upload.svg')" aria-hidden="true"></span>
+        <span>{{ _('Upload files') }}</span>
+    </button>
+    <button id="fm_menu_terminal_here" type="button">
+        <span class="fm-menu-image" style="--fm-icon:url('{{ resource }}/harbor_file_pro/icons/terminal.svg')" aria-hidden="true"></span>
+        <span>{{ _('Terminal') }}</span>
+    </button>
+    <button id="fm_menu_refresh" type="button">
+        <span class="fm-menu-image" style="--fm-icon:url('{{ resource }}/harbor_file_pro/icons/refresh.svg')" aria-hidden="true"></span>
+        <span>{{ _('Refresh') }}</span>
+    </button>
+</div>
+
+    <div id="fm_sort_menu" class="fm-context-menu">
+    <button type="button" data-sort-field="name"><span>{{ _('Name') }}</span></button>
+    <button type="button" data-sort-field="mtime"><span>{{ _('Modified') }}</span></button>
+    <button type="button" data-sort-field="type"><span>{{ _('Type') }}</span></button>
+    <button type="button" data-sort-field="size"><span>{{ _('Size') }}</span></button>
+    <div class="fm-context-menu-separator" role="separator"></div>
+    <button type="button" data-sort-order="asc"><span>{{ _('Ascending') }}</span></button>
+    <button type="button" data-sort-order="desc"><span>{{ _('Descending') }}</span></button>
+</div>
+
+    <div id="fm_modal_mask" class="fm-modal-mask"></div>
+
+<section id="fm_property_dialog" class="fm-dialog" role="dialog" aria-modal="true" aria-labelledby="fm_property_title">
+    <div class="fm-dialog-header">
+        <div id="fm_property_title" class="fm-dialog-title">{{ _('Properties') }}</div>
+        <button class="fm-dialog-close" type="button" aria-label="{{ _('Close') }}">&times;</button>
+    </div>
+    <div class="fm-property-body">
+        <img id="fm_property_icon" class="fm-property-icon" alt="">
+        <div class="fm-property-list">
+            <div class="fm-property-label">{{ _('Name') }}</div><div id="fm_property_name" class="fm-property-value">-</div>
+            <div class="fm-property-label">{{ _('Path') }}</div><div id="fm_property_path" class="fm-property-value">-</div>
+            <div class="fm-property-label">{{ _('Type') }}</div><div id="fm_property_type" class="fm-property-value">-</div>
+            <div class="fm-property-label">{{ _('Size') }}</div><div id="fm_property_size" class="fm-property-value">-</div>
+            <div class="fm-property-label">{{ _('Permissions') }}</div><div id="fm_property_mode" class="fm-property-value fm-flex-row">
+                <span id="fm_property_mode_text">-</span>
+                <button id="fm_property_edit_mode" class="fm-dialog-action" type="button">{{ _('Edit') }}</button>
+            </div>
+            <div id="fm_property_mode_edit" style="display:none;">
+                <div class="fm-property-label"></div>
+                <div class="fm-property-value perm-header">
+                    <span>R</span>
+                    <span>W</span>
+                    <span>X</span>
+                </div>
+                <div class="fm-property-label">{{ _('Owner') }}</div><div class="fm-property-value perm-checks">
+                    <input type="checkbox" class="perm-check">
+                    <input type="checkbox" class="perm-check">
+                    <input type="checkbox" class="perm-check">
+                </div>
+                <div class="fm-property-label">{{ _('Group') }}</div><div class="fm-property-value perm-checks">
+                    <input type="checkbox" class="perm-check">
+                    <input type="checkbox" class="perm-check">
+                    <input type="checkbox" class="perm-check">
+                </div>
+                <div class="fm-property-label">{{ _('Others') }}</div><div class="fm-property-value perm-checks">
+                    <input type="checkbox" class="perm-check">
+                    <input type="checkbox" class="perm-check">
+                    <input type="checkbox" class="perm-check">
+                </div>
+                <div class="fm-property-label">{{ _('Octal') }}</div><div class="fm-property-value fm-flex-row">
+                    <input id="fm_property_mode_input" type="text" size="4" maxlength="4" pattern="[0-7]{3,4}" style="width:50px;">
+                    <button id="fm_property_mode_save" class="fm-dialog-action primary" type="button">{{ _('Save') }}</button>
+                    <button id="fm_property_mode_cancel" class="fm-dialog-action" type="button">{{ _('Cancel') }}</button>
+                </div>
+            </div>
+            <div class="fm-property-label">{{ _('Modified') }}</div><div id="fm_property_mtime" class="fm-property-value">-</div>
+        </div>
+    </div>
+</section>
+
+<section id="fm_about_dialog" class="fm-dialog" role="dialog" aria-modal="true" aria-labelledby="fm_about_title">
+    <div class="fm-dialog-header">
+        <div id="fm_about_title" class="fm-dialog-title">{{ _('About') }}</div>
+        <button class="fm-dialog-close" type="button" aria-label="{{ _('Close') }}">&times;</button>
+    </div>
+    <div class="fm-about-body">
+        <div class="fm-about-brand">
+            <div class="fm-about-icon" aria-hidden="true">
+                <span class="fm-tool-image" style="--fm-icon:url('{{ resource }}/harbor_file_pro/icons/about.svg')"></span>
+            </div>
+            <div>
+                <div class="fm-about-name">Harbor File Pro</div>
+                <div class="fm-about-subtitle">{{ _('Harbor File is a powerful OpenWrt file management plugin') }}</div>
+            </div>
+        </div>
+        <div class="fm-about-card">
+            <div class="fm-about-card-head">
+                <span class="fm-about-card-name">Harbor File</span>
+                <span class="fm-about-card-tag">{{ _('Original project') }}</span>
+            </div>
+            <div class="fm-about-list">
+                <div class="fm-about-label">{{ _('Author') }}</div>
+                <div class="fm-about-value">TT</div>
+                <div class="fm-about-label">{{ _('License') }}</div>
+                <div class="fm-about-value">MIT License</div>
+                <div class="fm-about-label">{{ _('Project address') }}</div>
+                <div class="fm-about-value"><a href="https://github.com/destan19/luci-app-harbor-file" target="_blank" rel="noopener">github.com/destan19/luci-app-harbor-file</a></div>
+            </div>
+        </div>
+        <div class="fm-about-card is-pro">
+            <div class="fm-about-card-head">
+                <span class="fm-about-card-name">Harbor File Pro</span>
+                <span class="fm-about-card-tag">{{ _('Enhanced edition') }}</span>
+            </div>
+            <div class="fm-about-list">
+                <div class="fm-about-label">{{ _('Author') }}</div>
+                <div class="fm-about-value">whzhni1</div>
+                <div class="fm-about-label">{{ _('License') }}</div>
+                <div class="fm-about-value">MIT License</div>
+                <div class="fm-about-label">{{ _('Project address') }}</div>
+                <div class="fm-about-value"><a href="https://github.com/whzhni1/luci-app-harbor-file-pro" target="_blank" rel="noopener">github.com/whzhni1/luci-app-harbor-file-pro</a></div>
+            </div>
+        </div>
+        <div class="fm-about-copyright">Copyright &copy; 2026 FanchmWrt. Harbor File {{ _('All rights reserved.') }}</div>
+        <div class="fm-about-copyright">Copyright &copy; 2026 whzhni1. Harbor File Pro {{ _('All rights reserved.') }}</div>
+    </div>
+</section>
+
+<section id="fm_settings_dialog" class="fm-dialog fm-settings-dialog" role="dialog" aria-modal="true" aria-labelledby="fm_settings_title">
+    <div class="fm-dialog-header">
+        <div id="fm_settings_title" class="fm-dialog-title">{{ _('Settings') }}</div>
+        <button class="fm-dialog-close" type="button" aria-label="{{ _('Close') }}">&times;</button>
+    </div>
+    <div class="fm-settings-body">
+        <div class="fm-settings-shell">
+            <div class="fm-settings-menu" role="tablist" aria-label="{{ _('Settings categories') }}">
+                <button id="fm_settings_tab_basic" class="fm-settings-menu-item active" type="button" role="tab" aria-selected="true" aria-controls="fm_settings_panel_basic" data-settings-tab="basic">{{ _('Basic settings') }}</button>
+                <button id="fm_settings_tab_nginx" class="fm-settings-menu-item" type="button" role="tab" aria-selected="false" aria-controls="fm_settings_panel_nginx" data-settings-tab="nginx">{{ _('Web service') }}</button>
+            </div>
+            <div class="fm-settings-content">
+                <div id="fm_settings_panel_basic" class="fm-settings-panel active" role="tabpanel" aria-labelledby="fm_settings_tab_basic">
+                    <div class="fm-settings-panel-main">
+                        <div class="fm-settings-row">
+                            <div class="fm-settings-copy">
+                                <span class="fm-settings-label">{{ _('Default view') }}</span>
+                                <div class="fm-settings-desc">{{ _('Choose how files and folders are shown when Harbor File opens.') }}</div>
+                            </div>
+                            <div class="fm-settings-control-wrap">
+                                <select id="fm_settings_view_mode" class="fm-settings-control">
+                                    <option value="0">{{ _('Large icons') }}</option>
+                                    <option value="1">{{ _('Medium icons') }}</option>
+                                    <option value="2">{{ _('Small icons') }}</option>
+                                    <option value="3">{{ _('List') }}</option>
+                                    <option value="4">{{ _('Details') }}</option>
+                                    <option value="5">{{ _('Tiles') }}</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="fm-settings-row">
+                            <div class="fm-settings-copy">
+                                <span class="fm-settings-label">{{ _('Home directory') }}</span>
+                                <div class="fm-settings-desc">{{ _('Common folders are created under this directory and shown in Quick access.') }}</div>
+                            </div>
+                            <div class="fm-settings-control-wrap">
+                                <input id="fm_settings_home_dir" class="fm-settings-control fm-settings-path-control" type="text" placeholder="/tmp/root">
+                            </div>
+                        </div>
+                        <div class="fm-settings-row">
+                            <div class="fm-settings-copy">
+                                <span class="fm-settings-label">{{ _('System folder operations') }}</span>
+                                <div class="fm-settings-desc">{{ _('Allow create, rename, move, upload and delete actions in protected system folders.') }}</div>
+                            </div>
+                            <label class="fm-settings-switch" for="fm_settings_system_operations">
+                                <input id="fm_settings_system_operations" type="checkbox">
+                                <span class="fm-settings-switch-slider"></span>
+                            </label>
+                        </div>
+                        <div class="fm-settings-row">
+                            <div class="fm-settings-copy">
+                                <span class="fm-settings-label">{{ _('Show hidden files') }}</span>
+                                <div class="fm-settings-desc">{{ _('Show Linux hidden files and folders whose names start with a dot.') }}</div>
+                            </div>
+                            <label class="fm-settings-switch" for="fm_settings_show_hidden">
+                                <input id="fm_settings_show_hidden" type="checkbox">
+                                <span class="fm-settings-switch-slider"></span>
+                            </label>
+                        </div>
+                        <div class="fm-settings-row">
+                            <div class="fm-settings-copy">
+                                <span class="fm-settings-label">{{ _('Thumbnails') }}</span>
+                                <div class="fm-settings-desc">{{ _('Show cached image thumbnails in icon and tile views. Thumbnails only support image folders. After enabling this option, you can generate thumbnails in image folders.') }}</div>
+                            </div>
+                            <label class="fm-settings-switch" for="fm_settings_thumbnails">
+                                <input id="fm_settings_thumbnails" type="checkbox">
+                                <span class="fm-settings-switch-slider"></span>
+                            </label>
+                        </div>
+                        <div class="fm-settings-row">
+                            <div class="fm-settings-copy">
+                                <span class="fm-settings-label">{{ _('Auto indent') }}</span>
+                                <div class="fm-settings-desc">{{ _('Keep the indentation and indent the next line after an opening brace or parenthesis when editing code files.') }}</div>
+                            </div>
+                            <label class="fm-settings-switch" for="fm_settings_auto_indent">
+                                <input id="fm_settings_auto_indent" type="checkbox">
+                                <span class="fm-settings-switch-slider"></span>
+                            </label>
+                        </div>
+                        <div class="fm-settings-row">
+                            <div class="fm-settings-copy">
+                                <span class="fm-settings-label">{{ _('Auto wrap') }}</span>
+                                <div class="fm-settings-desc">{{ _('Wrap long lines to fit the window in the text editor.') }}</div>
+                            </div>
+                            <label class="fm-settings-switch" for="fm_settings_auto_wrap">
+                                <input id="fm_settings_auto_wrap" type="checkbox">
+                                <span class="fm-settings-switch-slider"></span>
+                            </label>
+                        </div>
+                        <div class="fm-settings-row">
+                            <div class="fm-settings-copy">
+                                <span class="fm-settings-label">{{ _('Restore last directory') }}</span>
+                                <div class="fm-settings-desc">{{ _('Reopen the last visited directory when Harbor File starts.') }}</div>
+                            </div>
+                            <label class="fm-settings-switch" for="fm_settings_restore_last_directory">
+                                <input id="fm_settings_restore_last_directory" type="checkbox">
+                                <span class="fm-settings-switch-slider"></span>
+                            </label>
+                        </div>
+                    </div>
+                    <div class="fm-settings-page-actions">
+                        <button id="fm_settings_basic_cancel" class="fm-dialog-action" type="button">{{ _('Cancel') }}</button>
+                        <button id="fm_settings_basic_save" class="fm-dialog-action primary" type="button">{{ _('Save') }}</button>
+                    </div>
+                </div>
+                <div id="fm_settings_panel_nginx" class="fm-settings-panel" role="tabpanel" aria-labelledby="fm_settings_tab_nginx">
+                    <div class="fm-settings-panel-main">
+                        <div class="fm-settings-intro">
+                            <div class="fm-settings-intro-title">
+                                <strong id="fm_web_server_title">Nginx</strong>
+                                <div class="fm-nginx-actions">
+                                    <span id="fm_nginx_status" class="fm-nginx-status checking">{{ _('Checking') }}</span>
+                                    <button id="fm_nginx_install" class="fm-nginx-command primary" type="button" style="display:none">{{ _('Install') }}</button>
+                                </div>
+                            </div>
+                            <div class="fm-settings-intro-desc">{{ _('A high-performance web server that improves video playback and file operation performance.') }}</div>
+                            <div id="fm_nginx_fcm_note" class="fm-settings-fcm-note">{{ _('This system is FanchmWrt. The default web server has already been optimized for basic file management and video playback, so switching to Nginx is not required.') }}</div>
+                        </div>
+                        <div id="fm_nginx_options">
+                            <div class="fm-settings-recommend">
+                                <button id="fm_nginx_recommend" class="fm-nginx-command primary" type="button">{{ _('Use recommended configuration') }}</button>
+                                <div class="fm-settings-recommend-desc">{{ _('Default configuration may keep upload and download limits. Recommended configuration can remove some limits.') }}</div>
+                            </div>
+                            <div class="fm-settings-field-group-title">{{ _('Nginx parameters') }}</div>
+                            <div class="fm-settings-row">
+                                <div class="fm-settings-copy">
+                                    <span class="fm-settings-label">{{ _('Client request body size') }}</span>
+                                    <div class="fm-settings-desc">{{ _('Set client_max_body_size in megabytes. Enter 0 for unlimited.') }}</div>
+                                </div>
+                                <div class="fm-settings-control-wrap">
+                                    <div class="fm-settings-input-group">
+                                        <input id="fm_settings_client_max_body_size" class="fm-settings-control fm-settings-number-control" type="number" min="0" max="1024" step="1">
+                                        <span id="fm_client_max_body_size_unit" class="fm-settings-unit">M</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="fm-settings-row">
+                                <div class="fm-settings-copy">
+                                    <span class="fm-settings-label">{{ _('File upload buffering') }}</span>
+                                    <div class="fm-settings-desc">{{ _('When enabled, uploaded files are buffered before being written to disk.') }}</div>
+                                </div>
+                                <label class="fm-settings-switch" for="fm_settings_uwsgi_request_buffering">
+                                    <input id="fm_settings_uwsgi_request_buffering" type="checkbox">
+                                    <span class="fm-settings-switch-slider"></span>
+                                </label>
+                            </div>
+                            <div class="fm-settings-field-group-title">{{ _('uWSGI parameters') }}</div>
+                            <div class="fm-settings-row">
+                                <div class="fm-settings-copy">
+                                    <span class="fm-settings-label">reload-on-as</span>
+                                </div>
+                                <div class="fm-settings-control-wrap">
+                                    <div class="fm-settings-control-line">
+                                        <label class="fm-settings-switch" for="fm_settings_reload_on_as_enabled">
+                                            <input id="fm_settings_reload_on_as_enabled" type="checkbox">
+                                            <span class="fm-settings-switch-slider"></span>
+                                        </label>
+                                        <input id="fm_settings_reload_on_as" class="fm-settings-control fm-settings-number-control" type="number" step="1">
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="fm-settings-row">
+                                <div class="fm-settings-copy">
+                                    <span class="fm-settings-label">reload-on-rss</span>
+                                </div>
+                                <div class="fm-settings-control-wrap">
+                                    <div class="fm-settings-control-line">
+                                        <label class="fm-settings-switch" for="fm_settings_reload_on_rss_enabled">
+                                            <input id="fm_settings_reload_on_rss_enabled" type="checkbox">
+                                            <span class="fm-settings-switch-slider"></span>
+                                        </label>
+                                        <input id="fm_settings_reload_on_rss" class="fm-settings-control fm-settings-number-control" type="number" step="1">
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="fm-settings-row">
+                                <div class="fm-settings-copy">
+                                    <span class="fm-settings-label">post-buffering</span>
+                                </div>
+                                <div class="fm-settings-control-wrap">
+                                    <input id="fm_settings_post_buffering" class="fm-settings-control fm-settings-number-control" type="number" step="1">
+                                </div>
+                            </div>
+                            <div class="fm-settings-row">
+                                <div class="fm-settings-copy">
+                                    <span class="fm-settings-label">limit-as</span>
+                                </div>
+                                <div class="fm-settings-control-wrap">
+                                    <input id="fm_settings_limit_as" class="fm-settings-control fm-settings-number-control" type="number" step="1">
+                                </div>
+                            </div>
+                            <div class="fm-settings-row">
+                                <div class="fm-settings-copy">
+                                    <span class="fm-settings-label">reload-mercy</span>
+                                </div>
+                                <div class="fm-settings-control-wrap">
+                                    <input id="fm_settings_reload_mercy" class="fm-settings-control fm-settings-number-control" type="number" step="1">
+                                </div>
+                            </div>
+                            <div class="fm-settings-row">
+                                <div class="fm-settings-copy">
+                                    <span class="fm-settings-label">buffer-size</span>
+                                </div>
+                                <div class="fm-settings-control-wrap">
+                                    <input id="fm_settings_buffer_size" class="fm-settings-control fm-settings-number-control" type="number" step="1">
+                                </div>
+                            </div>
+                        </div>
+                        <div id="fm_uhttpd_options" style="display:none">
+                            <div class="fm-settings-intro">
+                                <div class="fm-settings-intro-title">
+                                    <strong>uhttpd</strong>
+                                </div>
+                                <div class="fm-settings-intro-desc">{{ _('If large file uploads fail, increase the timeout values.') }}</div>
+                            </div>
+                            <div class="fm-settings-row">
+                                <div class="fm-settings-copy">
+                                    <span class="fm-settings-label">{{ _('Script timeout') }}</span>
+                                </div>
+                                <div class="fm-settings-control-wrap">
+                                    <div class="fm-settings-input-group">
+                                        <input id="fm_settings_uhttpd_script_timeout" class="fm-settings-control fm-settings-number-control" type="number" min="0" step="1">
+                                        <span class="fm-settings-unit">{{ _('Seconds') }}</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="fm-settings-row">
+                                <div class="fm-settings-copy">
+                                    <span class="fm-settings-label">{{ _('Network timeout') }}</span>
+                                </div>
+                                <div class="fm-settings-control-wrap">
+                                    <div class="fm-settings-input-group">
+                                        <input id="fm_settings_uhttpd_network_timeout" class="fm-settings-control fm-settings-number-control" type="number" min="0" step="1">
+                                        <span class="fm-settings-unit">{{ _('Seconds') }}</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div id="fm_nginx_page_actions" class="fm-settings-page-actions">
+                        <button id="fm_settings_nginx_cancel" class="fm-dialog-action" type="button">{{ _('Cancel') }}</button>
+                        <button id="fm_settings_nginx_save" class="fm-dialog-action primary" type="button">{{ _('Save') }}</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section id="fm_nginx_confirm_dialog" class="fm-dialog" role="dialog" aria-modal="true" aria-labelledby="fm_nginx_confirm_title">
+    <div class="fm-dialog-header">
+        <div id="fm_nginx_confirm_title" class="fm-dialog-title">{{ _('Install Nginx') }}</div>
+        <button class="fm-dialog-close" type="button" aria-label="{{ _('Close') }}">&times;</button>
+    </div>
+    <div class="fm-nginx-install-body">
+        <p class="fm-nginx-install-copy">{{ _('Install Nginx now?') }}</p>
+        <p class="fm-nginx-install-warning">{{ _('Installing Nginx will replace the current web server. After installation, the web service will restart and you must access the management interface through HTTPS.') }}</p>
+    </div>
+    <div class="fm-dialog-actions">
+        <button id="fm_nginx_confirm_cancel" class="fm-dialog-action" type="button">{{ _('Cancel') }}</button>
+        <button id="fm_nginx_confirm_start" class="fm-dialog-action primary" type="button">{{ _('Install') }}</button>
+    </div>
+</section>
+
+<section id="fm_nginx_install_dialog" class="fm-dialog" role="dialog" aria-modal="true" aria-labelledby="fm_nginx_install_title">
+    <div class="fm-dialog-header">
+        <div id="fm_nginx_install_title" class="fm-dialog-title">{{ _('Installing Nginx') }}</div>
+    </div>
+    <div class="fm-nginx-install-body">
+        <div class="fm-nginx-progress">
+            <div id="fm_nginx_spinner" class="fm-nginx-spinner" aria-hidden="true"></div>
+            <div id="fm_nginx_install_text" class="fm-nginx-progress-text">{{ _('Installing Nginx, please wait.') }}</div>
+        </div>
+        <div id="fm_nginx_install_hint" class="fm-nginx-progress-hint">{{ _('The web interface may be interrupted during installation. After installation, the login page will be reopened. If it cannot be accessed, please try again later.') }}</div>
+    </div>
+    <div id="fm_nginx_install_actions" class="fm-dialog-actions" style="display:none">
+        <button id="fm_nginx_install_done" class="fm-dialog-action primary" type="button">{{ _('Close') }}</button>
+    </div>
+</section>
+
+<section id="fm_overwrite_dialog" class="fm-dialog" role="dialog" aria-modal="true" aria-labelledby="fm_overwrite_title">
+    <div class="fm-dialog-header">
+        <div id="fm_overwrite_title" class="fm-dialog-title">{{ _('Replace existing files') }}</div>
+        <button class="fm-dialog-close" type="button" aria-label="{{ _('Close') }}">&times;</button>
+    </div>
+    <div class="fm-overwrite-body">
+        <p class="fm-overwrite-copy">{{ _('The following files already exist. Replace them with the uploaded files?') }}</p>
+        <ul id="fm_conflict_list" class="fm-conflict-list"></ul>
+    </div>
+    <div class="fm-dialog-actions">
+        <button id="fm_overwrite_confirm" class="fm-dialog-action primary" type="button">{{ _('Replace') }}</button>
+    </div>
+</section>
+
+<section id="fm_name_dialog" class="fm-dialog fm-name-dialog" role="dialog" aria-modal="true" aria-labelledby="fm_name_title">
+    <div class="fm-dialog-header">
+        <div id="fm_name_title" class="fm-dialog-title">{{ _('New folder') }}</div>
+        <button class="fm-dialog-close" type="button" aria-label="{{ _('Close') }}">&times;</button>
+    </div>
+    <div class="fm-form-body">
+        <label id="fm_name_label" class="fm-form-label" for="fm_name_input">{{ _('Folder name') }}</label>
+        <input id="fm_name_input" class="fm-form-input" type="text" maxlength="255" autocomplete="off">
+    </div>
+    <div class="fm-dialog-actions">
+        <button id="fm_name_cancel" class="fm-dialog-action" type="button">{{ _('Cancel') }}</button>
+        <button id="fm_name_confirm" class="fm-dialog-action primary" type="button">{{ _('Create') }}</button>
+    </div>
+</section>
+
+<section id="fm_delete_dialog" class="fm-dialog" role="dialog" aria-modal="true" aria-labelledby="fm_delete_title">
+    <div class="fm-dialog-header">
+        <div id="fm_delete_title" class="fm-dialog-title">{{ _('Confirm delete') }}</div>
+        <button class="fm-dialog-close" type="button" aria-label="{{ _('Close') }}">&times;</button>
+    </div>
+    <div class="fm-form-body">
+        <p class="fm-delete-copy">{{ _('Are you sure you want to permanently delete this item?') }}<strong id="fm_delete_name" class="fm-delete-name"></strong></p>
+    </div>
+    <div class="fm-dialog-actions">
+        <button id="fm_delete_cancel" class="fm-dialog-action" type="button">{{ _('Cancel') }}</button>
+        <button id="fm_delete_confirm" class="fm-dialog-action danger" type="button">{{ _('Delete') }}</button>
+    </div>
+</section>
+
+<section id="fm_bookmark_dialog" class="fm-dialog fm-bookmark-dialog" role="dialog" aria-modal="true" aria-labelledby="fm_bookmark_title">
+    <div class="fm-dialog-header">
+        <div id="fm_bookmark_title" class="fm-dialog-title">{{ _('Edit bookmark') }}</div>
+        <button class="fm-dialog-close" type="button" aria-label="{{ _('Close') }}">&times;</button>
+    </div>
+    <div class="fm-form-body">
+        <div id="fm_bookmark_form">
+            <label class="fm-form-label" for="fm_bookmark_label">{{ _('Bookmark name') }}</label>
+            <input id="fm_bookmark_label" class="fm-form-input" type="text" maxlength="64" autocomplete="off">
+            <label class="fm-form-label" for="fm_bookmark_path">{{ _('Bookmark path') }}</label>
+            <input id="fm_bookmark_path" class="fm-form-input" type="text" autocomplete="off">
+            <label class="fm-form-label" for="fm_bookmark_folder">{{ _('Folder') }}</label>
+            <select id="fm_bookmark_folder" class="fm-form-select">
+                <option value="">{{ _('No folder') }}</option>
+            </select>
+            <input id="fm_bookmark_folder_new" class="fm-form-input" type="text" maxlength="64" autocomplete="off" style="display:none" placeholder="{{ _('Folder name') }}">
+        </div>
+    </div>
+    <div class="fm-dialog-actions">
+        <button id="fm_bookmark_cancel" class="fm-dialog-action" type="button">{{ _('Cancel') }}</button>
+        <button id="fm_bookmark_confirm" class="fm-dialog-action primary" type="button">{{ _('Save') }}</button>
+    </div>
+</section>
+
+<section id="fm_target_dialog" class="fm-dialog fm-target-dialog" role="dialog" aria-modal="true" aria-labelledby="fm_target_title">
+    <div class="fm-dialog-header">
+        <div id="fm_target_title" class="fm-dialog-title">{{ _('Select destination folder') }}</div>
+        <button class="fm-dialog-close" type="button" aria-label="{{ _('Close') }}">&times;</button>
+    </div>
+    <div class="fm-target-body">
+        <div id="fm_target_source" class="fm-target-source">-</div>
+        <div class="fm-target-toolbar">
+            <button id="fm_target_up" class="fm-target-up" type="button" aria-label="{{ _('Up') }}"><span class="fm-target-image" style="--fm-icon:url('{{ resource }}/harbor_file_pro/icons/up.svg')" aria-hidden="true"></span></button>
+            <div id="fm_target_path" class="fm-target-path">/</div>
+        </div>
+        <div id="fm_target_list" class="fm-target-list"></div>
+    </div>
+    <div class="fm-dialog-actions">
+        <button id="fm_target_cancel" class="fm-dialog-action" type="button">{{ _('Cancel') }}</button>
+        <button id="fm_target_confirm" class="fm-dialog-action primary" type="button">{{ _('Confirm') }}</button>
+    </div>
+</section>
+
+<section id="fm_archive_dialog" class="fm-dialog" role="dialog" aria-modal="true" aria-labelledby="fm_archive_title">
+    <div class="fm-dialog-header">
+        <div id="fm_archive_title" class="fm-dialog-title">{{ _('Compress') }}</div>
+        <button class="fm-dialog-close" type="button" aria-label="{{ _('Close') }}">&times;</button>
+    </div>
+    <div class="fm-form-body">
+        <div id="fm_archive_source" class="fm-form-help">-</div>
+        <label class="fm-form-label" for="fm_archive_format">{{ _('Archive format') }}</label>
+        <select id="fm_archive_format" class="fm-form-select">
+            <option value="tar.gz">tar.gz</option>
+            <option value="tar">tar</option>
+        </select>
+        <label class="fm-form-label" for="fm_archive_name">{{ _('Archive name') }}</label>
+        <input id="fm_archive_name" class="fm-form-input" type="text" maxlength="255" autocomplete="off">
+        <label class="fm-form-label" for="fm_archive_target">{{ _('Target path') }}</label>
+        <input id="fm_archive_target" class="fm-form-input" type="text" autocomplete="off">
+    </div>
+    <div class="fm-dialog-actions">
+        <button id="fm_archive_cancel" class="fm-dialog-action" type="button">{{ _('Cancel') }}</button>
+        <button id="fm_archive_start" class="fm-dialog-action primary" type="button">{{ _('Compress') }}</button>
+    </div>
+</section>
+
+<section id="fm_extract_dialog" class="fm-dialog" role="dialog" aria-modal="true" aria-labelledby="fm_extract_title">
+    <div class="fm-dialog-header">
+        <div id="fm_extract_title" class="fm-dialog-title">{{ _('Extract') }}</div>
+        <button class="fm-dialog-close" type="button" aria-label="{{ _('Close') }}">&times;</button>
+    </div>
+    <div class="fm-form-body">
+        <div id="fm_extract_source" class="fm-form-help">-</div>
+        <label class="fm-form-label" for="fm_extract_target">{{ _('Target path') }}</label>
+        <input id="fm_extract_target" class="fm-form-input" type="text" autocomplete="off">
+    </div>
+    <div class="fm-dialog-actions">
+        <button id="fm_extract_cancel" class="fm-dialog-action" type="button">{{ _('Cancel') }}</button>
+        <button id="fm_extract_start" class="fm-dialog-action primary" type="button">{{ _('Extract') }}</button>
+    </div>
+</section>
+
+<section id="fm_archive_task_dialog" class="fm-dialog fm-text-dialog" role="dialog" aria-modal="true" aria-labelledby="fm_archive_task_title">
+    <div class="fm-dialog-header">
+        <div id="fm_archive_task_title" class="fm-dialog-title">{{ _('Archive operation') }}</div>
+        <button id="fm_archive_task_close" class="fm-dialog-close" type="button" aria-label="{{ _('Close') }}">&times;</button>
+    </div>
+    <div class="fm-package-install-body">
+        <div id="fm_archive_task_status" class="fm-package-status">-</div>
+        <div class="fm-package-list">
+            <div class="fm-package-label">{{ _('Path') }}</div><div id="fm_archive_task_path" class="fm-package-value">-</div>
+            <div class="fm-package-label">{{ _('Format') }}</div><div id="fm_archive_task_format" class="fm-package-value">-</div>
+            <div class="fm-package-label">{{ _('Exit code') }}</div><div id="fm_archive_task_exit" class="fm-package-value">-</div>
+        </div>
+        <pre id="fm_archive_task_log" class="fm-package-log">{{ _('No log yet') }}</pre>
+    </div>
+    <div class="fm-dialog-actions">
+        <button id="fm_archive_install_tool" class="fm-dialog-action primary" type="button" style="display:none">{{ _('Install') }}</button>
+        <button id="fm_archive_task_done" class="fm-dialog-action primary" type="button">{{ _('Close') }}</button>
+    </div>
+</section>
+
+<section id="fm_package_confirm_dialog" class="fm-dialog" role="dialog" aria-modal="true" aria-labelledby="fm_package_confirm_title">
+    <div class="fm-dialog-header">
+        <div id="fm_package_confirm_title" class="fm-dialog-title">{{ _('Install package') }}</div>
+        <button class="fm-dialog-close" type="button" aria-label="{{ _('Close') }}">&times;</button>
+    </div>
+    <div class="fm-package-confirm-body">
+        <p class="fm-package-copy">{{ _('Install this package now?') }}</p>
+        <div class="fm-package-list">
+            <div class="fm-package-label">{{ _('Name') }}</div><div id="fm_package_confirm_name" class="fm-package-value">-</div>
+            <div class="fm-package-label">{{ _('Path') }}</div><div id="fm_package_confirm_path" class="fm-package-value">-</div>
+            <div class="fm-package-label">{{ _('Type') }}</div><div id="fm_package_confirm_type" class="fm-package-value">-</div>
+            <div class="fm-package-label">{{ _('Installer') }}</div><div id="fm_package_confirm_installer" class="fm-package-value">-</div>
+        </div>
+    </div>
+    <div class="fm-dialog-actions">
+        <button id="fm_package_confirm_cancel" class="fm-dialog-action" type="button">{{ _('Cancel') }}</button>
+        <button id="fm_package_confirm_start" class="fm-dialog-action primary" type="button">{{ _('Install') }}</button>
+    </div>
+</section>
+
+<section id="fm_package_install_dialog" class="fm-dialog fm-text-dialog" role="dialog" aria-modal="true" aria-labelledby="fm_package_install_title">
+    <div class="fm-dialog-header">
+        <div id="fm_package_install_title" class="fm-dialog-title">{{ _('Installing package') }}</div>
+        <button id="fm_package_install_close" class="fm-dialog-close" type="button" aria-label="{{ _('Close') }}">&times;</button>
+    </div>
+    <div class="fm-package-install-body">
+        <div id="fm_package_install_status" class="fm-package-status">-</div>
+        <div class="fm-package-list">
+            <div class="fm-package-label">{{ _('Name') }}</div><div id="fm_package_install_name" class="fm-package-value">-</div>
+            <div class="fm-package-label">{{ _('Path') }}</div><div id="fm_package_install_path" class="fm-package-value">-</div>
+            <div class="fm-package-label">{{ _('Type') }}</div><div id="fm_package_install_type" class="fm-package-value">-</div>
+            <div class="fm-package-label">{{ _('Installer') }}</div><div id="fm_package_install_installer" class="fm-package-value">-</div>
+            <div class="fm-package-label">{{ _('Exit code') }}</div><div id="fm_package_install_exit" class="fm-package-value">-</div>
+        </div>
+        <pre id="fm_package_install_log" class="fm-package-log">{{ _('No log yet') }}</pre>
+    </div>
+    <div class="fm-dialog-actions">
+        <button id="fm_package_install_done" class="fm-dialog-action primary" type="button">{{ _('Close') }}</button>
+    </div>
+</section>
+
+<section id="fm_thumbnail_dialog" class="fm-dialog fm-text-dialog" role="dialog" aria-modal="true" aria-labelledby="fm_thumbnail_title">
+    <div class="fm-dialog-header">
+        <div id="fm_thumbnail_title" class="fm-dialog-title">{{ _('Generating thumbnails') }}</div>
+        <button id="fm_thumbnail_close" class="fm-dialog-close" type="button" aria-label="{{ _('Close') }}">&times;</button>
+    </div>
+    <div class="fm-package-install-body">
+        <div id="fm_thumbnail_status" class="fm-package-status">-</div>
+        <div class="fm-thumbnail-progress"><span id="fm_thumbnail_progress_bar"></span></div>
+        <div class="fm-package-list">
+            <div class="fm-package-label">{{ _('Path') }}</div><div id="fm_thumbnail_path" class="fm-package-value">-</div>
+            <div class="fm-package-label">{{ _('Current file') }}</div><div id="fm_thumbnail_current" class="fm-package-value">-</div>
+            <div class="fm-package-label">{{ _('Progress') }}</div><div id="fm_thumbnail_progress_text" class="fm-package-value">-</div>
+            <div class="fm-package-label">{{ _('Generated') }}</div><div id="fm_thumbnail_success" class="fm-package-value">-</div>
+            <div class="fm-package-label">{{ _('Cached') }}</div><div id="fm_thumbnail_cached" class="fm-package-value">-</div>
+            <div class="fm-package-label">{{ _('Failed') }}</div><div id="fm_thumbnail_failed" class="fm-package-value">-</div>
+        </div>
+        <pre id="fm_thumbnail_log" class="fm-package-log">{{ _('No log yet') }}</pre>
+    </div>
+    <div class="fm-dialog-actions">
+        <button id="fm_thumbnail_install_tool" class="fm-dialog-action primary" type="button" style="display:none">{{ _('Install GraphicsMagick') }}</button>
+        <button id="fm_thumbnail_done" class="fm-dialog-action primary" type="button">{{ _('Close') }}</button>
+    </div>
+</section>
+
+
+<section id="fm_terminal_dialog" class="fm-dialog fm-terminal-dialog" role="dialog" aria-modal="true" aria-labelledby="fm_terminal_title">
+    <div class="fm-dialog-header">
+        <div id="fm_terminal_title" class="fm-dialog-title">{{ _('Terminal') }}</div>
+        <button class="fm-dialog-close" type="button" aria-label="{{ _('Close') }}">&times;</button>
+    </div>
+    <div class="fm-terminal-shell">
+        <iframe id="fm_terminal_frame" class="fm-terminal-frame" src="about:blank" title="{{ _('Terminal') }}"></iframe>
+        <div id="fm_terminal_loading" class="fm-terminal-overlay show">
+            <div class="fm-terminal-panel">
+                <div class="fm-terminal-spinner"></div>
+                <div id="fm_terminal_loading_text" class="fm-terminal-message">{{ _('Connecting to terminal') }}</div>
+                <div id="fm_terminal_loading_hint" class="fm-terminal-subtext"></div>
+            </div>
+        </div>
+        <div id="fm_terminal_error" class="fm-terminal-overlay fm-terminal-error">
+            <div class="fm-terminal-panel">
+                <div id="fm_terminal_error_text" class="fm-terminal-message">{{ _('Terminal connection failed') }}</div>
+                <div id="fm_terminal_error_hint" class="fm-terminal-subtext">{{ _('Connection failed, please check whether the ttyd service is running and the port is correct') }}</div>
+                <button id="fm_terminal_install_tool" class="fm-dialog-action primary" type="button" style="display:none">{{ _('Install terminal plugin') }}</button>
+                <button id="fm_terminal_open_external" class="fm-dialog-action" type="button" style="display:none">{{ _('Open terminal in a new window') }}</button>
+            </div>
+        </div>
+    </div>
+</section>
+<script type="text/javascript">
+(function (HF) {
+    document.getElementById('fm_back').addEventListener('click', function() {
+        if (HF.state.history_index > 0) {
+            HF.state.history_index--;
+            HF.navigate(HF.state.history[HF.state.history_index], false);
+        }
+    });
+    document.getElementById('fm_forward').addEventListener('click', function() {
+        if (HF.state.history_index < HF.state.history.length - 1) {
+            HF.state.history_index++;
+            HF.navigate(HF.state.history[HF.state.history_index], false);
+        }
+    });
+    document.getElementById('fm_up').addEventListener('click', function() {
+        if (!HF.state.current || HF.state.current.kind !== 'directory') {
+            return;
+        }
+        if (HF.state.current.path === '/') {
+            HF.show_virtual('this_pc', true);
+        } else {
+            HF.open_path(HF.state.current.parent || '/', true);
+        }
+    });
+    document.getElementById('fm_refresh').addEventListener('click', function() {
+        HF.refresh_current();
+    });
+    document.getElementById('fm_view').addEventListener('click', function(event) {
+        event.stopPropagation();
+        for (var i = 0; i < view_buttons.length; i++) {
+            view_buttons[i].classList.toggle('active', view_buttons[i].getAttribute('data-view') === HF.state.view_mode);
+        }
+        var rect = this.getBoundingClientRect();
+        HF.show_context_menu('fm_view_menu', rect.left, rect.bottom + 4);
+    });
+    document.getElementById('fm_settings').addEventListener('click', function() {
+        HF.hide_context_menus();
+        HF.open_settings_dialog();
+    });
+    document.getElementById('fm_about').addEventListener('click', function() {
+        HF.hide_context_menus();
+        HF.open_modal('fm_about_dialog');
+    });
+    var view_buttons = document.querySelectorAll('#fm_view_menu [data-view]');
+    for (var view_index = 0; view_index < view_buttons.length; view_index++) {
+        view_buttons[view_index].addEventListener('click', function() {
+            HF.set_view_mode(this.getAttribute('data-view'));
+        });
+    }
+    document.getElementById('fm_menu_sort').addEventListener('mouseenter', HF.show_sort_menu);
+    document.getElementById('fm_menu_sort').addEventListener('click', function(event) {
+        event.preventDefault();
+        event.stopPropagation();
+        HF.show_sort_menu();
+    });
+    document.getElementById('fm_blank_menu').addEventListener('mousemove', function(event) {
+        if (!event.target.closest('#fm_menu_sort')) {
+            document.getElementById('fm_sort_menu').style.display = 'none';
+        }
+    });
+    var sort_field_buttons = document.querySelectorAll('#fm_sort_menu [data-sort-field]');
+    for (var sort_field_index = 0; sort_field_index < sort_field_buttons.length; sort_field_index++) {
+        sort_field_buttons[sort_field_index].addEventListener('click', function(event) {
+            event.stopPropagation();
+            HF.apply_directory_sort(this.getAttribute('data-sort-field'), null);
+        });
+    }
+    var sort_order_buttons = document.querySelectorAll('#fm_sort_menu [data-sort-order]');
+    for (var sort_order_index = 0; sort_order_index < sort_order_buttons.length; sort_order_index++) {
+        sort_order_buttons[sort_order_index].addEventListener('click', function(event) {
+            event.stopPropagation();
+            HF.apply_directory_sort(null, this.getAttribute('data-sort-order'));
+        });
+    }
+    document.getElementById('fm_upload_input').addEventListener('change', function() {
+        var files = Array.prototype.slice.call(this.files || []);
+        var target = HF.state.upload_target;
+        this.value = '';
+        HF.state.upload_target = null;
+        if (target) {
+            HF.begin_upload(files, target.path, target.label);
+        }
+    });
+    document.getElementById('fm_name_cancel').addEventListener('click', HF.close_modal);
+    document.getElementById('fm_delete_cancel').addEventListener('click', HF.close_modal);
+    document.getElementById('fm_settings_basic_cancel').addEventListener('click', HF.close_modal);
+    document.getElementById('fm_settings_nginx_cancel').addEventListener('click', HF.close_modal);
+    document.getElementById('fm_nginx_confirm_cancel').addEventListener('click', HF.close_modal);
+    document.getElementById('fm_nginx_install_done').addEventListener('click', HF.close_modal);
+    document.getElementById('fm_package_confirm_cancel').addEventListener('click', HF.close_modal);
+    document.getElementById('fm_package_install_done').addEventListener('click', HF.close_modal);
+    document.getElementById('fm_archive_cancel').addEventListener('click', HF.close_modal);
+    document.getElementById('fm_archive_task_done').addEventListener('click', HF.close_modal);
+    document.getElementById('fm_archive_install_tool').addEventListener('click', HF.start_archive_tool_install);
+    document.getElementById('fm_archive_format').addEventListener('change', HF.sync_archive_format_options);
+    document.getElementById('fm_archive_start').addEventListener('click', HF.submit_archive_dialog);
+    document.getElementById('fm_extract_cancel').addEventListener('click', HF.close_modal);
+    document.getElementById('fm_extract_start').addEventListener('click', HF.submit_extract_dialog);
+    document.getElementById('fm_extract_target').addEventListener('keydown', function(event) {
+        if (event.key === 'Enter') {
+            event.preventDefault();
+            HF.submit_extract_dialog();
+        }
+    });
+    document.getElementById('fm_archive_name').addEventListener('keydown', function(event) {
+        if (event.key === 'Enter') {
+            event.preventDefault();
+            HF.submit_archive_dialog();
+        }
+    });
+    document.getElementById('fm_thumbnail_done').addEventListener('click', HF.close_modal);
+    document.getElementById('fm_thumbnail_install_tool').addEventListener('click', HF.start_thumbnail_tool_install);
+    document.getElementById('fm_terminal_install_tool').addEventListener('click', HF.start_terminal_tool_install);
+    document.getElementById('fm_terminal_open_external').addEventListener('click', HF.open_terminal_external);
+    document.getElementById('fm_package_confirm_start').addEventListener('click', function() {
+        if (HF.state.install_item) {
+            HF.start_package_install(HF.state.install_item);
+        }
+    });
+    document.getElementById('fm_settings_basic_save').addEventListener('click', HF.save_basic_settings_dialog);
+    document.getElementById('fm_settings_nginx_save').addEventListener('click', HF.save_web_server_settings_dialog);
+    document.getElementById('fm_nginx_recommend').addEventListener('click', HF.use_recommended_nginx_settings);
+    document.getElementById('fm_nginx_install').addEventListener('click', HF.open_nginx_install_confirm);
+    document.getElementById('fm_nginx_confirm_start').addEventListener('click', HF.start_nginx_install);
+    document.getElementById('fm_settings_client_max_body_size').addEventListener('input', HF.render_nginx_body_size_unit);
+    document.getElementById('fm_settings_reload_on_as_enabled').addEventListener('change', HF.sync_uwsgi_toggle_inputs);
+    document.getElementById('fm_settings_reload_on_rss_enabled').addEventListener('change', HF.sync_uwsgi_toggle_inputs);
+    var settings_tabs = document.querySelectorAll('[data-settings-tab]');
+    for (var settings_tab_index = 0; settings_tab_index < settings_tabs.length; settings_tab_index++) {
+        settings_tabs[settings_tab_index].addEventListener('click', function() {
+            HF.set_settings_tab(this.getAttribute('data-settings-tab'));
+        });
+    }
+    document.getElementById('fm_overwrite_confirm').addEventListener('click', function() {
+        var batch = HF.state.pending_upload;
+        HF.state.pending_upload = null;
+        HF.close_modal();
+        if (batch) {
+            HF.upload_batch(batch);
+        }
+    });
+    document.getElementById('fm_menu_open').addEventListener('click', function() {
+        HF.open_item(HF.state.context_item);
+    });
+    document.getElementById('fm_menu_open_binary').addEventListener('click', function() {
+        HF.hide_context_menus();
+        HF.open_binary(HF.state.context_item);
+    });
+    document.getElementById('fm_menu_properties').addEventListener('click', function() {
+        HF.hide_context_menus();
+        HF.open_properties(HF.state.context_item);
+    });
+    document.getElementById('fm_menu_terminal').addEventListener('click', function() {
+        HF.open_terminal(HF.state.context_item);
+    });
+    document.getElementById('fm_menu_download').addEventListener('click', function() {
+        HF.hide_context_menus();
+        HF.trigger_download(HF.state.context_item);
+    });
+    document.getElementById('fm_menu_compress').addEventListener('click', function() {
+        var items = HF.context_selection(HF.state.context_item);
+        HF.hide_context_menus();
+        HF.open_archive_dialog(items);
+    });
+    document.getElementById('fm_menu_extract').addEventListener('click', function() {
+        var item = HF.state.context_item;
+        HF.hide_context_menus();
+        HF.start_archive_extract(item);
+    });
+    document.getElementById('fm_menu_copy').addEventListener('click', function() {
+        HF.hide_context_menus();
+        HF.set_clipboard('copy', HF.context_selection(HF.state.context_item));
+    });
+    document.getElementById('fm_menu_cut').addEventListener('click', function() {
+        HF.hide_context_menus();
+        HF.set_clipboard('cut', HF.context_selection(HF.state.context_item));
+    });
+    document.getElementById('fm_menu_paste').addEventListener('click', function() {
+        var item = HF.state.context_item;
+        if (item && item.type === 'directory') {
+            HF.run_paste(item.path);
+        }
+    });
+    document.getElementById('fm_menu_upload').addEventListener('click', function() {
+        var item = HF.state.context_item;
+        HF.hide_context_menus();
+        if (item && item.type === 'directory') {
+            HF.trigger_upload(item.path, item.name);
+        }
+    });
+    document.getElementById('fm_menu_rename').addEventListener('click', function() {
+        var item = HF.state.context_item;
+        HF.hide_context_menus();
+        HF.open_name_dialog('rename', item);
+    });
+    document.getElementById('fm_menu_delete').addEventListener('click', function() {
+        var items = HF.context_selection(HF.state.context_item);
+        HF.hide_context_menus();
+        HF.open_delete_dialog(items);
+    });
+    document.getElementById('fm_menu_copy_to').addEventListener('click', function() {
+        var items = HF.context_selection(HF.state.context_item);
+        HF.hide_context_menus();
+        HF.open_transfer_dialog('copy', items);
+    });
+    document.getElementById('fm_menu_move_to').addEventListener('click', function() {
+        var items = HF.context_selection(HF.state.context_item);
+        HF.hide_context_menus();
+        HF.open_transfer_dialog('move', items);
+    });
+    document.getElementById('fm_menu_new_folder').addEventListener('click', function() {
+        HF.hide_context_menus();
+        if (HF.state.current && HF.state.current.kind === 'directory' && !HF.get_write_block_reason(HF.state.current.path)) {
+            HF.open_name_dialog('create');
+        } else {
+            HF.set_write_block_status(HF.state.current ? HF.get_write_block_reason(HF.state.current.path) : HF.labels.system_folder_blocked);
+        }
+    });
+    document.getElementById('fm_menu_new_file').addEventListener('click', function() {
+        HF.hide_context_menus();
+        if (HF.state.current && HF.state.current.kind === 'directory' && !HF.get_write_block_reason(HF.state.current.path)) {
+            HF.open_name_dialog('create_file');
+        } else {
+            HF.set_write_block_status(HF.state.current ? HF.get_write_block_reason(HF.state.current.path) : HF.labels.system_folder_blocked);
+        }
+    });
+    document.getElementById('fm_menu_paste_here').addEventListener('click', function() {
+        if (HF.state.current && HF.state.current.kind === 'directory') {
+            HF.run_paste(HF.state.current.path);
+        } else {
+            HF.hide_context_menus();
+            HF.set_warning_status(HF.labels.clipboard_empty);
+        }
+    });
+    document.getElementById('fm_menu_upload_here').addEventListener('click', function() {
+        HF.hide_context_menus();
+        if (HF.state.current && HF.state.current.kind === 'directory' && HF.can_upload_to_path(HF.state.current.path)) {
+            HF.trigger_upload(HF.state.current.path, HF.path_title(HF.state.current.path));
+        } else {
+            HF.set_write_block_status(HF.state.current ? HF.get_write_block_reason(HF.state.current.path) : HF.labels.system_folder_blocked);
+        }
+    });
+    document.getElementById('fm_menu_terminal_here').addEventListener('click', function() {
+        HF.open_terminal(null);
+    });
+    document.getElementById('fm_menu_refresh').addEventListener('click', function() {
+        HF.hide_context_menus();
+        HF.refresh_current();
+    });
+    document.getElementById('fm_name_confirm').addEventListener('click', HF.submit_name_dialog);
+    document.getElementById('fm_name_input').addEventListener('keydown', function(event) {
+        if (event.key === 'Enter') {
+            event.preventDefault();
+            HF.submit_name_dialog();
+        }
+    });
+    document.getElementById('fm_delete_confirm').addEventListener('click', function() {
+        var items = HF.normalize_item_list(HF.state.delete_items && HF.state.delete_items.length ? HF.state.delete_items : [HF.state.delete_item]);
+        HF.close_modal();
+        if (items.length) {
+            HF.Util.ajax({
+                url: HF.api.batch_delete,
+                type: 'POST',
+                dataType: 'json',
+                data: { paths: JSON.stringify(HF.item_list_paths(items)) },
+                success: function(res) {
+                    if (!res || res.code !== 0) {
+                        HF.set_error_status((res && res.message) || HF.labels.operation_failed);
+                        return;
+                    }
+                    HF.set_status(HF.labels.delete_complete, 'success');
+                    HF.refresh_after_write();
+                },
+                error: function(xhr) {
+                    HF.set_error_status(HF.batch_error_message(xhr, HF.labels.operation_failed));
+                }
+            });
+        }
+    });
+    document.getElementById('fm_target_cancel').addEventListener('click', HF.close_modal);
+    document.getElementById('fm_target_confirm').addEventListener('click', HF.confirm_transfer);
+    document.getElementById('fm_target_up').addEventListener('click', function() {
+        if (HF.state.target_path !== '/') {
+            HF.load_target_directory(HF.state.target_parent || '/');
+        }
+    });
+    document.getElementById('fm_content').addEventListener('mousedown', HF.start_marquee_selection);
+    document.getElementById('fm_content').addEventListener('contextmenu', function(event) {
+        if (event.target.closest('.fm-item')) {
+            return;
+        }
+        event.preventDefault();
+        HF.state.context_item = null;
+        var writable_page = HF.state.current && HF.state.current.kind === 'directory';
+        var current_path = writable_page ? HF.state.current.path : '';
+        var system_reason = HF.get_write_block_reason(current_path);
+        HF.set_button_state('fm_menu_sort', !writable_page, '');
+        HF.update_sort_menu_state();
+        HF.set_button_state(
+            'fm_menu_new_folder',
+            !writable_page || !!HF.get_write_block_reason(current_path),
+            system_reason
+        );
+        HF.set_button_state(
+            'fm_menu_new_file',
+            !writable_page || !!HF.get_write_block_reason(current_path),
+            system_reason
+        );
+        document.getElementById('fm_menu_paste_here').style.display =
+            writable_page && HF.has_clipboard() ? 'flex' : 'none';
+        HF.set_button_state(
+            'fm_menu_paste_here',
+            !writable_page || !HF.can_paste_to_path(current_path),
+            system_reason
+        );
+        HF.set_button_state(
+            'fm_menu_upload_here',
+            !writable_page || HF.state.uploading || !HF.can_upload_to_path(current_path),
+            system_reason
+        );
+        HF.set_button_state('fm_menu_terminal_here', false, '');
+        if (system_reason) {
+            HF.set_write_block_status(system_reason);
+        }
+        HF.show_context_menu('fm_blank_menu', event.clientX, event.clientY);
+    });
+    document.getElementById('fm_content').addEventListener('dragenter', function(event) {
+        if (!HF.state.uploading && HF.state.current && HF.state.current.kind === 'directory' &&
+                HF.can_upload_to_path(HF.state.current.path) && HF.is_file_drag(event) && !event.target.closest('.fm-item')) {
+            event.preventDefault();
+            HF.show_drag_target(this, HF.state.current.path, HF.path_title(HF.state.current.path));
+        }
+    });
+    document.getElementById('fm_content').addEventListener('dragover', function(event) {
+        if (!HF.state.uploading && HF.state.current && HF.state.current.kind === 'directory' &&
+                HF.can_upload_to_path(HF.state.current.path) && HF.is_file_drag(event) && !event.target.closest('.fm-item')) {
+            event.preventDefault();
+            event.dataTransfer.dropEffect = 'copy';
+        }
+    });
+    document.getElementById('fm_content').addEventListener('dragleave', function(event) {
+        if (!event.relatedTarget || !this.contains(event.relatedTarget)) {
+            HF.clear_drag_state();
+        }
+    });
+    document.getElementById('fm_content').addEventListener('drop', function(event) {
+        if (!HF.state.uploading && HF.state.current && HF.state.current.kind === 'directory' &&
+                HF.can_upload_to_path(HF.state.current.path) && HF.is_file_drag(event) && !event.target.closest('.fm-item')) {
+            HF.handle_file_drop(event, HF.state.current.path, HF.path_title(HF.state.current.path));
+        }
+    });
+
+    document.getElementById('fm_favorites').addEventListener('click', function(event) {
+        event.stopPropagation();
+        HF.on_favorites_button(this);
+    });
+    document.getElementById('fm_bookmark_cancel').addEventListener('click', HF.close_modal);
+    document.getElementById('fm_bookmark_folder').addEventListener('change', function() {
+        var creating = this.value === '__new__';
+        document.getElementById('fm_bookmark_folder_new').style.display = creating ? '' : 'none';
+        if (creating) {
+            document.getElementById('fm_bookmark_folder_new').focus();
+        }
+    });
+    document.getElementById('fm_bookmark_confirm').addEventListener('click', function() { HF.submit_bookmark_dialog(); });
+    document.getElementById('fm_menu_bookmark_open').addEventListener('click', function() {
+        HF.hide_context_menus();
+        var item = HF.state.bookmark_menu_item;
+        if (!item) { return; }
+        if (item.is_folder) { HF.open_bookmark_folder(item); return; }
+        HF.close_fav_panel(); HF.close_modal(); HF.open_path(item.path, true);
+    });
+    document.getElementById('fm_menu_bookmark_edit').addEventListener('click', function() {
+        HF.hide_context_menus();
+        var item = HF.state.bookmark_menu_item;
+        if (!item) { return; }
+        if (item.is_folder) { HF.open_name_dialog('bm_folder_rename', { folder: item.folder }); return; }
+        HF.open_bookmark_editor(item);
+    });
+    document.getElementById('fm_menu_bookmark_up').addEventListener('click', function() {
+        HF.hide_context_menus();
+        var item = HF.state.bookmark_menu_item;
+        if (!item) { return; }
+        if (item.is_folder) { HF.move_bookmark_folder(item.folder, 'up'); return; }
+        HF.move_bookmark(item, 'up');
+    });
+    document.getElementById('fm_menu_bookmark_down').addEventListener('click', function() {
+        HF.hide_context_menus();
+        var item = HF.state.bookmark_menu_item;
+        if (!item) { return; }
+        if (item.is_folder) { HF.move_bookmark_folder(item.folder, 'down'); return; }
+        HF.move_bookmark(item, 'down');
+    });
+    document.getElementById('fm_menu_bookmark_delete').addEventListener('click', function() {
+        HF.hide_context_menus();
+        var item = HF.state.bookmark_menu_item;
+        if (!item) { return; }
+        if (item.is_folder) { HF.delete_bookmark_folder(item.folder); return; }
+        HF.delete_bookmark(item);
+    });
+    var close_buttons = document.querySelectorAll('.fm-dialog-close');
+    for (var close_index = 0; close_index < close_buttons.length; close_index++) {
+        close_buttons[close_index].addEventListener('click', HF.close_modal);
+    }
+    document.addEventListener('click', HF.hide_context_menus);
+    document.addEventListener('dragend', HF.clear_drag_state);
+    document.addEventListener('dragover', function(event) {
+        if (HF.is_file_drag(event)) {
+            event.preventDefault();
+        }
+    });
+    document.addEventListener('drop', function(event) {
+        if (HF.is_file_drag(event)) {
+            event.preventDefault();
+            HF.clear_drag_state();
+            HF.set_warning_status(HF.state.uploading ? HF.labels.upload_busy : HF.labels.select_upload_target);
+        }
+    });
+    window.addEventListener('scroll', function() {
+        HF.hide_item_hover_card();
+        HF.hide_context_menus();
+    }, true);
+    document.addEventListener('keydown', function(event) {
+        if (event.key === 'Escape') {
+            HF.hide_context_menus();
+            HF.close_modal();
+        }
+    });
+
+    (function() {
+        var content = document.getElementById('fm_content');
+        var longPressTimer = null;
+        var touchStartX = 0;
+        var touchStartY = 0;
+        var isLongPress = false;
+        var isDragging = false;
+        var isSelecting = false;
+        var scrollInterval = null;
+        var SCROLL_THRESHOLD = 50;
+        var SCROLL_SPEED = 8;
+        
+        var DRAG_THRESHOLD = 14;
+        var FLICK_VELOCITY = 0.55;   
+        var DIRECTION_RATIO = 1.0;   
+        var MIN_MARQUEE_DX = 14;     
+        var touchStartOnBlank = false;
+        var touchStartTime = 0;
+        var multiTouch = false;
+        var isScrolling = false;
+        var scrollStartTop = 0;
+        var marqueeAccumulated = {};
+
+        function getScrollContainer() {
+            var node = content;
+            while (node && node !== document.body) {
+                var style = window.getComputedStyle(node);
+                if (/(auto|scroll)/.test(style.overflowY) &&
+                        node.scrollHeight > node.clientHeight) {
+                    return node;
+                }
+                node = node.parentElement;
+            }
+            return document.scrollingElement || document.documentElement;
+        }
+
+        function startScroll(direction) {
+            stopScroll();
+            scrollInterval = setInterval(function() {
+                var scroller = getScrollContainer();
+                scroller.scrollTop += direction * SCROLL_SPEED;
+
+                if (isSelecting) {
+                    updateMarqueeFromTouch();
+                }
+            }, 16);
+        }
+
+        function stopScroll() {
+            if (scrollInterval) {
+                clearInterval(scrollInterval);
+                scrollInterval = null;
+            }
+        }
+
+        function updateMarqueeFromTouch() {
+            if (!isSelecting) return;
+
+            var touch = window._lastTouch;
+            if (!touch) return;
+
+            updateMarqueeSelection(touch.clientX, touch.clientY);
+        }
+
+        function updateMarqueeSelection(cx, cy) {
+            if (!HF.state.selection_dragging) return;
+
+            var rect = HF.selection_rect(
+                HF.state.selection_start_x,
+                HF.state.selection_start_y,
+                cx,
+                cy
+            );
+
+            var width = rect.right - rect.left;
+            var height = rect.bottom - rect.top;
+
+            if (width > 3 || height > 3) {
+                HF.state.selection_moved = true;
+            }
+
+            var box = HF.ensure_selection_box();
+
+            box.style.display = HF.state.selection_moved ? 'block' : 'none';
+            box.style.left = rect.left + 'px';
+            box.style.top = rect.top + 'px';
+            box.style.width = width + 'px';
+            box.style.height = height + 'px';
+
+            if (!HF.state.selection_moved) return;
+
+            var selected = HF.state.selection_base.slice();
+            var seen = {};
+
+            selected.forEach(function(item) {
+                if (item && item.path) {
+                    seen[item.path] = true;
+                }
+            });
+
+            
+            for (var path in marqueeAccumulated) {
+                if (Object.prototype.hasOwnProperty.call(marqueeAccumulated, path) && !seen[path]) {
+                    selected.push(marqueeAccumulated[path]);
+                    seen[path] = true;
+                }
+            }
+
+            HF.rendered_file_items().forEach(function(entry) {
+                if (entry.node.offsetParent === null || seen[entry.item.path]) {
+                    return;
+                }
+
+                if (HF.rects_intersect(
+                    rect,
+                    entry.node.getBoundingClientRect()
+                )) {
+                    selected.push(entry.item);
+                    seen[entry.item.path] = true;
+                    marqueeAccumulated[entry.item.path] = entry.item;
+                }
+            });
+
+            HF.set_selected_items(
+                selected,
+                selected.length ? selected[selected.length - 1] : null,
+                HF.state.selection_anchor
+            );
+        }
+
+        function isInFolderContent(clientX, clientY) {
+            var target = document.elementFromPoint(clientX, clientY);
+            var item = target ? target.closest('.fm-item') : null;
+
+            if (item) {
+                var main = item.querySelector('.fm-item-main');
+
+                if (main) {
+                    var rect = main.getBoundingClientRect();
+
+                    if (
+                        clientX >= rect.left &&
+                        clientX <= rect.right &&
+                        clientY >= rect.top &&
+                        clientY <= rect.bottom
+                    ) {
+                        return true;
+                    }
+                } else {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        content.addEventListener('touchstart', function(e) {
+            
+            if (e.touches.length > 1) {
+                multiTouch = true;
+                if (longPressTimer) {
+                    clearTimeout(longPressTimer);
+                    longPressTimer = null;
+                }
+                return;
+            }
+            multiTouch = false;
+
+            var touch = e.touches[0];
+
+            touchStartTime = Date.now();
+            touchStartX = touch.clientX;
+            touchStartY = touch.clientY;
+            touchStartOnBlank = !isInFolderContent(
+                touchStartX,
+                touchStartY
+            );
+
+            if (!touchStartOnBlank) {
+                return;
+            }
+
+            if (HF.state.drag_item) {
+                return;
+            }
+
+            isLongPress = false;
+            isDragging = false;
+            isSelecting = false;
+            isScrolling = false;
+            scrollStartTop = getScrollContainer().scrollTop;
+            marqueeAccumulated = {};
+
+            HF.state.selection_dragging = false;
+            HF.state.selection_moved = false;
+
+            HF.state.selection_base =
+                (e.ctrlKey || e.metaKey)
+                    ? HF.selected_items()
+                    : [];
+
+            if (!e.ctrlKey && !e.metaKey && !e.shiftKey) {
+                HF.clear_selection();
+            }
+
+            HF.state.selection_start_x = touchStartX;
+            HF.state.selection_start_y = touchStartY;
+            HF.state.selection_anchor =
+                HF.state.selection_base.length
+                    ? HF.state.selection_base[0]
+                    : null;
+
+            if (longPressTimer) {
+                clearTimeout(longPressTimer);
+            }
+
+            longPressTimer = setTimeout(function() {
+                longPressTimer = null;
+
+                if (
+                    !isDragging &&
+                    touchStartOnBlank &&
+                    !HF.state.drag_item
+                ) {
+                    isLongPress = true;
+                    HF.show_context_menu(
+                        'fm_blank_menu',
+                        touchStartX,
+                        touchStartY
+                    );
+                }
+            }, 500);
+        }, { passive: true });
+
+        content.addEventListener('touchmove', function(e) {
+            
+            if (e.cancelable === false) {
+                return;
+            }
+            var touch = e.touches[0];
+
+            window._lastTouch = touch;
+
+            if (HF.state.drag_item) {
+                isSelecting = false;
+                isDragging = false;
+                HF.state.selection_dragging = false;
+
+                if (HF.state.selection_box) {
+                    HF.state.selection_box.style.display = 'none';
+                }
+
+                var dragClientY = touch.clientY;
+                var dragTopDist = dragClientY;
+                var dragBottomDist =
+                    window.innerHeight - dragClientY;
+
+                if (dragTopDist < SCROLL_THRESHOLD) {
+                    startScroll(-1);
+                } else if (dragBottomDist < SCROLL_THRESHOLD) {
+                    startScroll(1);
+                } else {
+                    stopScroll();
+                }
+
+                return;
+            }
+
+            if (!touchStartOnBlank) {
+                return;
+            }
+
+            var dx = touch.clientX - touchStartX;
+            var dy = touch.clientY - touchStartY;
+            var absDx = Math.abs(dx);
+            var absDy = Math.abs(dy);
+            var distance = Math.sqrt(dx * dx + dy * dy);
+
+            if (!isDragging && !isScrolling) {
+                if (distance < DRAG_THRESHOLD) {
+                    
+                    if (distance > 6) {
+                        e.preventDefault();
+                    }
+                    return;
+                }
+
+                var velocity = distance / Math.max(1, Date.now() - touchStartTime);
+                var wantsMarquee =
+                    !multiTouch &&
+                    velocity <= FLICK_VELOCITY &&
+                    absDx >= MIN_MARQUEE_DX &&
+                    absDx >= absDy * DIRECTION_RATIO;
+
+                if (longPressTimer) {
+                    clearTimeout(longPressTimer);
+                    longPressTimer = null;
+                }
+
+                if (wantsMarquee) {
+                    isDragging = true;
+                    isSelecting = true;
+                    HF.state.selection_dragging = true;
+
+                    HF.state.selection_base =
+                        HF.state.selection_base.length
+                            ? HF.state.selection_base.slice()
+                            : [];
+
+                    HF.ensure_selection_box();
+
+                    updateMarqueeSelection(
+                        touch.clientX,
+                        touch.clientY
+                    );
+
+                    document
+                        .getElementById('fm_content')
+                        .classList.add('selecting');
+                } else {
+                    
+                    isScrolling = true;
+                    e.preventDefault();
+                }
+            }
+
+            if (isScrolling) {
+                
+                e.preventDefault();
+                var scroller = getScrollContainer();
+                scroller.scrollTop =
+                    scrollStartTop + (touchStartY - touch.clientY);
+                return;
+            }
+
+            if (!isDragging) {
+                return;
+            }
+
+            e.preventDefault();
+
+            if (longPressTimer) {
+                clearTimeout(longPressTimer);
+                longPressTimer = null;
+            }
+
+            updateMarqueeSelection(
+                touch.clientX,
+                touch.clientY
+            );
+
+            var clientY = touch.clientY;
+            var topDist = clientY;
+            var bottomDist =
+                window.innerHeight - clientY;
+
+            if (topDist < SCROLL_THRESHOLD) {
+                startScroll(-1);
+            } else if (bottomDist < SCROLL_THRESHOLD) {
+                startScroll(1);
+            } else {
+                stopScroll();
+            }
+        }, { passive: false });
+
+        content.addEventListener('touchend', function(e) {
+            if (longPressTimer) {
+                clearTimeout(longPressTimer);
+                longPressTimer = null;
+            }
+
+            stopScroll();
+            window._lastTouch = null;
+
+            if (isSelecting) {
+                HF.state.selection_dragging = false;
+
+                if (HF.state.selection_box) {
+                    HF.state.selection_box.style.display = 'none';
+                }
+
+                document
+                    .getElementById('fm_content')
+                    .classList.remove('selecting');
+            }
+
+            if (touchStartOnBlank && !HF.state.drag_item) {
+                if (isSelecting) {
+                    if (!isDragging && !isLongPress) {
+                        HF.clear_selection();
+                    }
+                } else {
+                    if (!isLongPress) {
+                        HF.clear_selection();
+                    }
+                }
+            }
+
+            isSelecting = false;
+            isDragging = false;
+            isScrolling = false;
+            isLongPress = false;
+            HF.state.selection_dragging = false;
+            touchStartOnBlank = false;
+        }, { passive: true });
+    })();
+
+    
+    
+    document.addEventListener('keydown', function(event) {
+        if (event.key === 'Escape' && HF.window_manager.active &&
+                !HF.window_manager.active.legacy && !event.defaultPrevented) {
+            event.preventDefault();
+            HF.window_manager.close(HF.window_manager.active);
+        }
+    });
+
+    HF.load_preferences(function() {
+        HF.refresh_navigation(function() {
+            var restored = false;
+            if (HF.state.preferences.restore_last_directory === 1) {
+                var last = HF.state.preferences.last_directory || '';
+                if (last && last.charAt(0) === '/') {
+                    HF.open_path(last, true);
+                    restored = true;
+                }
+            }
+            if (!restored) {
+                HF.show_virtual('quick_access', true);
+            }
+            document.getElementById('fm_address').addEventListener('click', function(e) {
+                if (e.target.closest('.fm-crumb') || e.target.closest('.fm-address-star')) {
+                    return;
+                }
+                if (HF.state.current && HF.state.current.kind === 'directory' && !HF.state.address_editing) {
+                    HF.enter_address_edit();
+                }
+            });
+        });
+    });
+})(window.HarborFile);
+</script>
+
+{% include('footer') %}

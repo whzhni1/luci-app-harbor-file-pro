@@ -1,0 +1,61 @@
+{
+	"luci-app-harbor-file-pro": {
+		"description": "Grant filesystem access to the HarborFile manager (streams via /cgi-bin/harbor-io-pro, not cgi-io)",
+		"read": {
+			"file": {
+				"/": [
+					"list"
+				],
+				"/*": [
+					"list",
+					"read"
+				]
+			},
+			"ubus": {
+				"file": [
+					"list",
+					"read",
+					"stat"
+				],
+				"harbor.file": [
+					"read"
+				],
+				"luci": [
+					"getFeatures"
+				],
+				"session": [
+					"access"
+				],
+				"system": [
+					"info",
+					"board"
+				]
+			},
+			"uci": [
+				"harbor_file_pro",
+				"ttyd",
+				"uhttpd"
+			]
+		},
+		"write": {
+			"file": {
+				"/*": [
+					"write"
+				]
+			},
+			"ubus": {
+				"file": [
+					"exec",
+					"remove",
+					"write"
+				],
+				"harbor.file": [
+					"write"
+				]
+			},
+			"uci": [
+				"harbor_file_pro"
+			]
+		}
+	}
+}
