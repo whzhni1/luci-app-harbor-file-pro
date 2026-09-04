@@ -15,7 +15,8 @@ const open = _fs.open,
       writefile = _fs.writefile,
       popen = _fs.popen,
       basename = _fs.basename,
-      dirname = _fs.dirname;
+      dirname = _fs.dirname,
+      readlink = _fs.readlink;
 
 const cursor = require('uci').cursor;
 
@@ -106,7 +107,8 @@ const PREFERENCE_DEFAULTS = {
 	editor_auto_wrap: 0,
 	restore_last_directory: 1,
 	show_line_numbers: 1,
-	last_directory: ''
+	last_directory: '',
+	update_mirror: 'auto'
 };
 
 const BOOLEAN_VALUES  = { "0": true, "1": true };
@@ -302,9 +304,50 @@ function normalize_home_dir(value) {
 	return n;
 }
 
+function ensure_config_file() {
+	if (stat(CONFIG_FILE))
+		return true;
+
+	return writefile(CONFIG_FILE, sprintf("config %s '%s'\n", CONFIG, CONFIG_SECTION)) != null;
+}
+
+// Load the config on a fresh cursor, healing the file when needed:
+//   missing  -> created by ensure_config_file()
+//   unloadable (e.g. parse error from a migrated/edited file)
+//            -> moved to <file>.bak and recreated with defaults
+// Returns { uci, err } -- exactly one is set; err already translated.
+function open_config() {
+	if (!ensure_config_file())
+		return { uci: null, err: sprintf(tr('Cannot create %s'), CONFIG_FILE) };
+
+	for (let attempt = 0; attempt < 2; attempt++) {
+		let uci = cursor();
+
+		if (uci.load(CONFIG))
+			return { uci, err: null };
+
+		let detail;
+		try { detail = require('uci').error(); }
+		catch (e) { detail = null; }
+
+		warn(sprintf('[harborpro] uci.load(%s) failed (%s), healing file\n',
+			CONFIG, detail ?? 'unknown'));
+
+		try { rename(CONFIG_FILE, CONFIG_FILE + '.bak'); }
+		catch (e) {}
+		if (writefile(CONFIG_FILE, sprintf("config %s '%s'\n", CONFIG, CONFIG_SECTION)) == null)
+			return { uci: null, err: sprintf(tr('Cannot create %s'), CONFIG_FILE) };
+	}
+
+	return { uci: null, err: sprintf(tr('Cannot load the %s UCI config'), CONFIG) };
+}
+
 function read_preferences() {
-	let uci = cursor();
-	uci.load(CONFIG);
+	let opened = open_config();
+	let uci = opened.uci;
+
+	if (!uci)
+		return { ...PREFERENCE_DEFAULTS };
 
 	const g = (k) => uci.get(CONFIG, CONFIG_SECTION, k);
 
@@ -319,6 +362,8 @@ function read_preferences() {
 		restore_last_directory:  normalize_number(g('restore_last_directory'), PREFERENCE_DEFAULTS.restore_last_directory, BOOLEAN_VALUES),
 		show_line_numbers:       normalize_number(g('show_line_numbers'), PREFERENCE_DEFAULTS.show_line_numbers, BOOLEAN_VALUES),
 		last_directory:          '' + (g('last_directory') ?? ''),
+		update_mirror:        ((g('update_mirror') == 'gitee' || g('update_mirror') == 'github' || g('update_mirror') == 'gitlab') ? g('update_mirror') : 'auto'),
+		open_type_map:           g('open_type_map') ?? '',
 
 		window_width:         normalize_dimension(g('window_width'),         PREFERENCE_DEFAULTS.window_width),
 		window_height:        normalize_dimension(g('window_height'),        PREFERENCE_DEFAULTS.window_height),
@@ -330,21 +375,12 @@ function read_preferences() {
 	return p;
 }
 
-function ensure_config_file() {
-	if (stat(CONFIG_FILE))
-		return true;
-
-	return writefile(CONFIG_FILE, sprintf("config %s '%s'\n", CONFIG, CONFIG_SECTION)) != null;
-}
-
 function save_preference_values(values) {
-	if (!ensure_config_file())
-		return sprintf(tr('Cannot create %s'), CONFIG_FILE);
+	let opened = open_config();
+	let uci = opened.uci;
 
-	let uci = cursor();
-
-	if (!uci.load(CONFIG))
-		return sprintf(tr('Cannot load the %s UCI config'), CONFIG);
+	if (!uci)
+		return opened.err;
 
 	if (!uci.get(CONFIG, CONFIG_SECTION))
 		uci.set(CONFIG, CONFIG_SECTION, CONFIG);
@@ -532,6 +568,23 @@ function stat_to_item(name, path, st, lst) {
 	let is_link = (lst?.type == 'link');
 	let kind = st.type;
 
+	let link_target = null;
+
+	if (is_link) {
+		let raw = readlink(path);
+
+		if (raw != null) {
+			let abs = (substr(raw, 0, 1) == '/')
+				? raw
+				: join_path(parent_path(path) ?? '/', raw);
+
+			link_target = {
+				raw,
+				path: normalize_path(abs) ?? abs
+			};
+		}
+	}
+
 	let item_type = (kind == 'directory') ? 'directory' : (is_link ? 'symlink' : 'file');
 	let ext = (kind == 'directory') ? '' : file_extension(name);
 
@@ -548,6 +601,7 @@ function stat_to_item(name, path, st, lst) {
 		ext,
 		extension: ext,
 		preview: (item_type == 'directory') ? 'none' : classify_preview(path, name),
+		link_target,
 		hidden: (substr(name, 0, 1) == '.')
 	};
 }
@@ -1146,6 +1200,10 @@ function api_save_preferences() {
 			values[key] = v;
 	}
 
+	let mirror = http.formvalue('update_mirror');
+	if (mirror != null && (mirror == 'auto' || mirror == 'gitee' || mirror == 'github' || mirror == 'gitlab'))
+		values.update_mirror = mirror;
+
 	let home = http.formvalue('home_dir');
 	if (home != null && home != '') {
 		let n = normalize_path(home);
@@ -1154,6 +1212,10 @@ function api_save_preferences() {
 		mkdir_p(n);
 		values.home_dir = n;
 	}
+
+	let open_type_map = http.formvalue('open_type_map');
+	if (open_type_map != null)
+		values.open_type_map = open_type_map;
 
 	if (!length(values))
 		return fail(http, 1, tr('Nothing to save'));
@@ -1687,8 +1749,8 @@ function parse_path_array(http_obj, field) {
 
 
 function read_bookmarks() {
-	let uci = cursor();
-	if (!uci.load(CONFIG))
+	let uci = open_config().uci;
+	if (!uci)
 		return [];
 
 	let out = [];
@@ -1713,8 +1775,8 @@ function write_bookmarks(list) {
 	if (!ensure_config_file())
 		return sprintf(tr('Cannot create %s'), CONFIG_FILE);
 
-	let uci = cursor();
-	if (!uci.load(CONFIG))
+	let uci = open_config().uci;
+	if (!uci)
 		return sprintf(tr('Cannot load the %s UCI config'), CONFIG);
 
 	let stale = [];
@@ -1762,8 +1824,8 @@ function bookmark_payload(list) {
 }
 
 function read_bookmark_folders() {
-	let uci = cursor();
-	if (!uci.load(CONFIG))
+	let uci = open_config().uci;
+	if (!uci)
 		return [];
 
 	let out = [];
@@ -1781,8 +1843,8 @@ function write_bookmark_folders(list) {
 	if (!ensure_config_file())
 		return sprintf(tr('Cannot create %s'), CONFIG_FILE);
 
-	let uci = cursor();
-	if (!uci.load(CONFIG))
+	let uci = open_config().uci;
+	if (!uci)
 		return sprintf(tr('Cannot load the %s UCI config'), CONFIG);
 
 	let stale = [];
@@ -1828,8 +1890,8 @@ function bookmark_folders_payload(list) {
 }
 
 function read_fav_expanded() {
-	let uci = cursor();
-	if (!uci.load(CONFIG))
+	let uci = open_config().uci;
+	if (!uci)
 		return [];
 
 	let v = uci.get_all(CONFIG, CONFIG_SECTION)?.fav_expanded ?? [];
@@ -1846,8 +1908,8 @@ function write_fav_expanded(list) {
 	if (!ensure_config_file())
 		return sprintf(tr('Cannot create %s'), CONFIG_FILE);
 
-	let uci = cursor();
-	if (!uci.load(CONFIG))
+	let uci = open_config().uci;
+	if (!uci)
 		return sprintf(tr('Cannot load the %s UCI config'), CONFIG);
 
 	if (!uci.get(CONFIG, CONFIG_SECTION))

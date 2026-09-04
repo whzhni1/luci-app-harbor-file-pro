@@ -1,1 +1,374 @@
-.fm-desktop-window,.fm-window-taskbar{--fm-accent:#2878d4;--fm-accent-soft:#e8f2fd;--fm-panel:#FFF;--fm-border:#d8e0e9;--fm-text:#17212b;--fm-muted:#667483;--fm-hover:#e4edf7;--fm-danger:#c33b3b;font-family:"Segoe UI","Microsoft YaHei",sans-serif}[data-darkmode="true"] .fm-desktop-window,[data-darkmode="true"] .fm-window-taskbar{--fm-accent:#62a9f3;--fm-accent-soft:#183b60;--fm-panel:#18212b;--fm-border:#344353;--fm-text:#edf4fb;--fm-muted:#9eb0c1;--fm-hover:#243242;--fm-danger:#dc6565}.fm-modal-mask{display:none!important;pointer-events:none!important}.fm-window-managed{position:fixed;box-sizing:border-box;min-width:260px;min-height:150px;max-width:calc(100vw - 16px);max-height:calc(100vh - 16px);display:flex;flex-direction:column;overflow:hidden;border-radius:10px;box-shadow:0 22px 58px rgba(15,30,46,0.28);transform:none!important;isolation:isolate}.fm-desktop-window{border:1px solid var(--fm-border);background:var(--fm-panel);color:var(--fm-text)}[data-darkmode="true"] .fm-window-managed{box-shadow:0 22px 58px rgba(0,0,0,0.48)}.fm-window-managed.fm-window-focused{box-shadow:0 26px 66px rgba(18,41,64,0.34),0 0 0 1px rgba(40,120,212,0.15)}[data-darkmode="true"] .fm-window-managed.fm-window-focused{box-shadow:0 26px 66px rgba(0,0,0,0.58),0 0 0 1px rgba(98,169,243,0.22)}.fm-window-managed.fm-window-maximized{border-radius:8px}.fm-window-titlebar{display:flex;flex:0 0 auto;min-width:0;min-height:42px;align-items:center;gap:8px;border-bottom:1px solid var(--fm-border);background:var(--fm-panel);cursor:move;touch-action:none;user-select:none;-webkit-user-select:none;padding:0 8px 0 14px}.fm-window-title{min-width:0;flex:1;overflow:hidden;color:var(--fm-text);font-size:14px;font-weight:600;line-height:1.3;text-overflow:ellipsis;white-space:nowrap}.fm-window-controls{display:inline-flex;align-items:center;gap:2px;flex:0 0 auto;cursor:default;touch-action:manipulation}.fm-window-control{display:inline-flex;width:30px;height:28px;align-items:center;justify-content:center;border:0;border-radius:5px;background:transparent;color:var(--fm-muted);cursor:pointer;font:inherit;font-size:17px;line-height:1;touch-action:manipulation;padding:0}.fm-window-control:hover,.fm-window-control:focus-visible{background:var(--fm-hover);color:var(--fm-text);outline:none}.fm-window-control.fm-window-close:hover,.fm-window-control.fm-window-close:focus-visible{background:#d94848;color:#FFF}.fm-window-control-symbol{display:block;line-height:1;transform:translateY(-1px)}.fm-window-control[data-window-action="maximize"] .fm-window-control-symbol{font-size:15px}.fm-window-titlebar .fm-dialog-close{flex:0 0 auto;margin:0}.fm-window-body{display:flex;min-width:0;min-height:0;flex:1 1 auto;flex-direction:column;overflow:hidden}.fm-window-managed > .fm-dialog-actions{flex:0 0 auto;margin-top:0;border-top:1px solid var(--fm-border);overflow-x:auto;-webkit-overflow-scrolling:touch;padding:12px 16px}.fm-dialog.fm-window-managed > :not(.fm-window-titlebar):not(.fm-dialog-actions):not(.fm-terminal-shell){flex:1 1 auto;min-height:0;overflow:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch}.fm-dialog.fm-window-managed > :not(.fm-window-titlebar):not(.fm-dialog-actions):not(.fm-terminal-shell) > :not(img){min-width:280px}.fm-dialog.fm-window-managed .fm-property-value,.fm-dialog.fm-window-managed .fm-overwrite-body,.fm-dialog.fm-window-managed .fm-package-confirm-body{overflow-wrap:anywhere}.fm-window-resize{position:absolute;z-index:20;touch-action:none}.fm-window-resize-n,.fm-window-resize-s{right:8px;left:8px;height:7px;cursor:ns-resize}.fm-window-resize-n{top:0}.fm-window-resize-s{bottom:0}.fm-window-resize-e,.fm-window-resize-w{top:8px;bottom:8px;width:7px;cursor:ew-resize}.fm-window-resize-e{right:0}.fm-window-resize-w{left:0}.fm-window-resize-ne,.fm-window-resize-sw,.fm-window-resize-nw,.fm-window-resize-se{width:12px;height:12px}.fm-window-resize-ne{top:0;right:0;cursor:nesw-resize}.fm-window-resize-sw{bottom:0;left:0;cursor:nesw-resize}.fm-window-resize-nw{top:0;left:0;cursor:nwse-resize}.fm-window-resize-se{right:0;bottom:0;cursor:nwse-resize}body.fm-window-dragging,body.fm-window-dragging *{cursor:move!important;user-select:none!important;-webkit-user-select:none!important}body.fm-window-resizing,body.fm-window-resizing *{user-select:none!important;-webkit-user-select:none!important}.fm-window-taskbar{position:fixed;right:8px;bottom:max(6px,env(safe-area-inset-bottom));left:8px;z-index:8600;display:flex;min-width:0;align-items:center;pointer-events:none}.fm-window-taskbar-list{display:flex;max-width:100%;min-width:0;gap:6px;overflow-x:auto;border:1px solid rgba(131,146,163,0.36);border-radius:10px;background:rgba(250,252,255,0.88);box-shadow:0 8px 24px rgba(18,35,54,0.18);backdrop-filter:blur(12px);pointer-events:auto;scrollbar-width:thin;padding:5px}[data-darkmode="true"] .fm-window-taskbar-list{background:rgba(18,28,39,0.9);box-shadow:0 8px 24px rgba(0,0,0,0.36);border-color:rgba(125,145,164,0.36)}.fm-window-taskbar.is-empty{display:none}.fm-window-task{display:inline-flex;min-width:0;max-width:190px;height:34px;align-items:center;gap:7px;border:1px solid transparent;border-radius:7px;background:transparent;color:var(--fm-text);cursor:pointer;font:inherit;font-size:12px;text-align:left;padding:0 10px}.fm-window-task:hover,.fm-window-task:focus-visible{background:var(--fm-hover);outline:none;border-color:var(--fm-border)}.fm-window-task.is-active{background:var(--fm-accent-soft);color:var(--fm-accent);border-color:rgba(40,120,212,0.28)}.fm-window-task.is-minimized{opacity:0.74}.fm-window-task-icon{width:17px;height:17px;flex:0 0 auto;object-fit:contain}.fm-window-task-fallback{display:inline-flex;width:17px;height:17px;flex:0 0 auto;align-items:center;justify-content:center;border-radius:4px;background:var(--fm-accent);color:#FFF;font-size:11px;font-weight:700}.fm-window-task-label{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+.fm-desktop-window,
+.fm-window-taskbar{
+    --fm-accent: #2878d4;
+    --fm-accent-soft: #e8f2fd;
+    --fm-panel: #ffffff;
+    --fm-border: #d8e0e9;
+    --fm-text: #17212b;
+    --fm-muted: #667483;
+    --fm-hover: #e4edf7;
+    --fm-danger: #c33b3b;
+    font-family: "Segoe UI", "Microsoft YaHei", sans-serif;
+}
+
+[data-darkmode="true"] .fm-desktop-window,
+[data-darkmode="true"] .fm-window-taskbar{
+    --fm-accent: #62a9f3;
+    --fm-accent-soft: #183b60;
+    --fm-panel: #18212b;
+    --fm-border: #344353;
+    --fm-text: #edf4fb;
+    --fm-muted: #9eb0c1;
+    --fm-hover: #243242;
+    --fm-danger: #dc6565;
+}
+
+.fm-modal-mask{
+    display: none !important;
+    pointer-events: none !important;
+}
+
+.fm-window-managed{
+    position: fixed;
+    box-sizing: border-box;
+    min-width: 260px;
+    min-height: 150px;
+    max-width: calc(100vw - 16px);
+    max-height: calc(100vh - 16px);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    border-radius: 10px;
+    box-shadow: 0 22px 58px rgba(15, 30, 46, 0.28);
+    transform: none !important;
+    isolation: isolate;
+}
+
+.fm-desktop-window{
+    border: 1px solid var(--fm-border);
+    background: var(--fm-panel);
+    color: var(--fm-text);
+}
+
+[data-darkmode="true"] .fm-window-managed{
+    box-shadow: 0 22px 58px rgba(0, 0, 0, 0.48);
+}
+
+.fm-window-managed.fm-window-focused{
+    box-shadow: 0 26px 66px rgba(18, 41, 64, 0.34), 0 0 0 1px rgba(40, 120, 212, 0.15);
+}
+
+[data-darkmode="true"] .fm-window-managed.fm-window-focused{
+    box-shadow: 0 26px 66px rgba(0, 0, 0, 0.58), 0 0 0 1px rgba(98, 169, 243, 0.22);
+}
+
+.fm-window-managed.fm-window-maximized{
+    border-radius: 8px;
+}
+
+.fm-window-titlebar{
+    display: flex;
+    flex: 0 0 auto;
+    min-width: 0;
+    min-height: 42px;
+    align-items: center;
+    gap: 8px;
+    padding: 0 8px 0 14px;
+    border-bottom: 1px solid var(--fm-border);
+    background: var(--fm-panel);
+    cursor: move;
+    touch-action: none;
+    user-select: none;
+    -webkit-user-select: none;
+}
+
+.fm-window-title{
+    min-width: 0;
+    flex: 1;
+    overflow: hidden;
+    color: var(--fm-text);
+    font-size: 14px;
+    font-weight: 600;
+    line-height: 1.3;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.fm-window-controls{
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    flex: 0 0 auto;
+    cursor: default;
+    touch-action: manipulation;
+}
+
+.fm-window-control{
+    display: inline-flex;
+    width: 30px;
+    height: 28px;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    border: 0;
+    border-radius: 5px;
+    background: transparent;
+    color: var(--fm-muted);
+    cursor: pointer;
+    font: inherit;
+    font-size: 17px;
+    line-height: 1;
+    touch-action: manipulation;
+}
+
+.fm-window-control:hover,
+.fm-window-control:focus-visible{
+    background: var(--fm-hover);
+    color: var(--fm-text);
+    outline: none;
+}
+
+.fm-window-control.fm-window-close:hover,
+.fm-window-control.fm-window-close:focus-visible{
+    background: #d94848;
+    color: #ffffff;
+}
+
+.fm-window-control-symbol{
+    display: block;
+    line-height: 1;
+    transform: translateY(-1px);
+}
+
+.fm-window-control[data-window-action="maximize"] .fm-window-control-symbol{
+    font-size: 15px;
+}
+
+.fm-window-titlebar .fm-dialog-close{
+    flex: 0 0 auto;
+    margin: 0;
+}
+
+.fm-window-body{
+    display: flex;
+    min-width: 0;
+    min-height: 0;
+    flex: 1 1 auto;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.fm-window-managed > .fm-dialog-actions{
+    flex: 0 0 auto;
+    margin-top: 0;
+    padding: 12px 16px;
+    border-top: 1px solid var(--fm-border);
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+.fm-dialog.fm-window-managed > *:not(.fm-window-titlebar):not(.fm-dialog-actions):not(.fm-terminal-shell){
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+}
+
+.fm-dialog.fm-window-managed > *:not(.fm-window-titlebar):not(.fm-dialog-actions):not(.fm-terminal-shell) > *:not(img){
+    min-width: 280px;
+}
+
+.fm-dialog.fm-window-managed .fm-property-value,
+.fm-dialog.fm-window-managed .fm-overwrite-body,
+.fm-dialog.fm-window-managed .fm-package-confirm-body{
+    overflow-wrap: anywhere;
+}
+
+.fm-window-resize{
+    position: absolute;
+    z-index: 20;
+    touch-action: none;
+}
+
+.fm-window-resize-n,
+.fm-window-resize-s{
+    right: 8px;
+    left: 8px;
+    height: 7px;
+    cursor: ns-resize;
+}
+.fm-window-resize-n{ top: 0; }
+.fm-window-resize-s{ bottom: 0; }
+.fm-window-resize-e,
+.fm-window-resize-w{
+    top: 8px;
+    bottom: 8px;
+    width: 7px;
+    cursor: ew-resize;
+}
+.fm-window-resize-e{ right: 0; }
+.fm-window-resize-w{ left: 0; }
+.fm-window-resize-ne,
+.fm-window-resize-sw,
+.fm-window-resize-nw,
+.fm-window-resize-se{
+    width: 12px;
+    height: 12px;
+}
+.fm-window-resize-ne{ top: 0; right: 0; cursor: nesw-resize; }
+.fm-window-resize-sw{ bottom: 0; left: 0; cursor: nesw-resize; }
+.fm-window-resize-nw{ top: 0; left: 0; cursor: nwse-resize; }
+.fm-window-resize-se{ right: 0; bottom: 0; cursor: nwse-resize; }
+
+body.fm-window-dragging,
+body.fm-window-dragging *{
+    cursor: move !important;
+    user-select: none !important;
+    -webkit-user-select: none !important;
+}
+
+body.fm-window-resizing,
+body.fm-window-resizing *{
+    user-select: none !important;
+    -webkit-user-select: none !important;
+}
+
+.fm-window-taskbar{
+    position: fixed;
+    right: 8px;
+    bottom: max(6px, env(safe-area-inset-bottom));
+    left: 8px;
+    z-index: 8600;
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    pointer-events: none;
+}
+
+.fm-window-taskbar-list{
+    display: flex;
+    max-width: 100%;
+    min-width: 0;
+    gap: 6px;
+    padding: 5px;
+    overflow-x: auto;
+    border: 1px solid rgba(131, 146, 163, 0.36);
+    border-radius: 10px;
+    background: rgba(250, 252, 255, 0.88);
+    box-shadow: 0 8px 24px rgba(18, 35, 54, 0.18);
+    backdrop-filter: blur(12px);
+    pointer-events: auto;
+    scrollbar-width: thin;
+}
+
+[data-darkmode="true"] .fm-window-taskbar-list{
+    border-color: rgba(125, 145, 164, 0.36);
+    background: rgba(18, 28, 39, 0.9);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.36);
+}
+
+.fm-window-taskbar.is-empty{
+    display: none;
+}
+
+.fm-window-task{
+    display: inline-flex;
+    min-width: 0;
+    max-width: 190px;
+    height: 34px;
+    align-items: center;
+    gap: 7px;
+    padding: 0 10px;
+    border: 1px solid transparent;
+    border-radius: 7px;
+    background: transparent;
+    color: var(--fm-text);
+    cursor: pointer;
+    font: inherit;
+    font-size: 12px;
+    text-align: left;
+}
+
+.fm-window-task:hover,
+.fm-window-task:focus-visible{
+    border-color: var(--fm-border);
+    background: var(--fm-hover);
+    outline: none;
+}
+
+.fm-window-task.is-active{
+    border-color: rgba(40, 120, 212, 0.28);
+    background: var(--fm-accent-soft);
+    color: var(--fm-accent);
+}
+
+.fm-window-task.is-minimized{
+    opacity: 0.74;
+}
+
+.fm-window-task-icon{
+    width: 17px;
+    height: 17px;
+    flex: 0 0 auto;
+    object-fit: contain;
+}
+
+.fm-window-task-fallback{
+    display: inline-flex;
+    width: 17px;
+    height: 17px;
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    background: var(--fm-accent);
+    color: #ffffff;
+    font-size: 11px;
+    font-weight: 700;
+}
+
+.fm-window-task-label{
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+
+.fm-taskbar-pill{
+    position: fixed;
+    bottom: max(3px, env(safe-area-inset-bottom));
+    left: 50%;
+    z-index: 8599;
+    display: none;
+    width: clamp(96px, 30vw, 260px);
+    height: 6px;
+    padding: 0;
+    border: 0;
+    border-radius: 999px;
+    background: rgba(131, 146, 163, 0.55);
+    box-shadow: 0 2px 8px rgba(18, 35, 54, 0.22);
+    cursor: pointer;
+    transform: translateX(-50%);
+    transition: background 0.15s ease;
+}
+
+.fm-taskbar-pill:hover{
+    background: rgba(40, 120, 212, 0.85);
+}
+
+[data-darkmode="true"] .fm-taskbar-pill{
+    background: rgba(125, 145, 164, 0.6);
+}
+
+[data-darkmode="true"] .fm-taskbar-pill:hover{
+    background: rgba(98, 169, 243, 0.85);
+}
+
+@media (pointer: coarse){
+    .fm-taskbar-pill{
+        height: 7px;
+    }
+}

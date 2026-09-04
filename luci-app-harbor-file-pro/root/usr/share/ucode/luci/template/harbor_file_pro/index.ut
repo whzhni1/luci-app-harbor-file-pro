@@ -59,6 +59,9 @@ HarborFile.init({
         detect_type: '{{ dispatcher.build_url('admin', 'harbor_pro', 'detect_type') }}',
         save_last_directory: '{{ dispatcher.build_url('admin', 'harbor_pro', 'save_last_directory') }}',
         save_show_line_numbers: '{{ dispatcher.build_url('admin', 'harbor_pro', 'save_show_line_numbers') }}',
+        update_check: '{{ dispatcher.build_url('admin', 'harbor_pro', 'update_check') }}',
+        update_start: '{{ dispatcher.build_url('admin', 'harbor_pro', 'update_start') }}',
+        update_status: '{{ dispatcher.build_url('admin', 'harbor_pro', 'update_status') }}',
         bookmark_save: '{{ dispatcher.build_url('admin', 'harbor_pro', 'bookmark_save') }}',
         bookmark_delete: '{{ dispatcher.build_url('admin', 'harbor_pro', 'bookmark_delete') }}',
         bookmark_move: '{{ dispatcher.build_url('admin', 'harbor_pro', 'bookmark_move') }}',
@@ -73,6 +76,7 @@ HarborFile.init({
         video_no_range: '{{ _('Web server does not support Range requests and available memory is too small to play this video') }}',
         quick_access: '{{ _('Quick access') }}',
         favorites: '{{ _('Favorites') }}',
+        more: '{{ _('More') }}',
         add_bookmark: '{{ _('Add bookmark') }}',
         edit_bookmark: '{{ _('Edit bookmark') }}',
         bookmark_name: '{{ _('Bookmark name') }}',
@@ -84,6 +88,37 @@ HarborFile.init({
         move_down: '{{ _('Move down') }}',
         remove_bookmark: '{{ _('Remove bookmark') }}',
         no_folder: '{{ _('No folder') }}',
+        current_version: '{{ _('Current version') }}',
+        latest_version: '{{ _('Latest version') }}',
+        open_with: '{{ _('Open with') }}',
+        text_editor: '{{ _('Text editor') }}',
+        image_viewer: '{{ _('Image viewer') }}',
+        video_player: '{{ _('Video player') }}',
+        pdf_viewer: '{{ _('PDF viewer') }}',
+        hex_editor: '{{ _('Hex editor') }}',
+        not_text_opened_hex: '{{ _('Not a text file, opened in the hex editor') }}',
+        jump_offset: '{{ _('Offset') }}',
+        go: '{{ _('Go') }}',
+        prev_window: '{{ _('Previous') }}',
+        next_window: '{{ _('Next') }}',
+        search_hex_placeholder: '{{ _('DE AD BE EF') }}',
+        replace_hex_placeholder: '{{ _('Replace hex, e.g. 00 00') }}',
+        replaced_count: '{{ _('replaced') }}',
+        replacing: '{{ _('Replacing') }}',
+        found_at: '{{ _('Found at') }}',
+        not_found: '{{ _('Not found') }}',
+        saved: '{{ _('Saved') }}',
+        check_update: '{{ _('Check for updates') }}',
+        update_now: '{{ _('Update now') }}',
+        up_to_date: '{{ _('Already up to date') }}',
+        update_available: '{{ _('Update available') }}',
+        update_check_failed: '{{ _('Version check failed') }}',
+        mirror: '{{ _('Mirror') }}',
+        automatic: '{{ _('Auto') }}',
+        downloading_update: '{{ _('Downloading package') }}',
+        downloading_lang: '{{ _('Downloading language pack') }}',
+        installing_update: '{{ _('Installing update') }}',
+        update_finished: '{{ _('Update finished, please refresh the page') }}',
         new_folder: '{{ _('New folder') }}',
         rename_folder: '{{ _('Rename folder') }}',
         delete_folder: '{{ _('Delete folder') }}',
@@ -385,6 +420,7 @@ window.HarborFile.tr = function (msgid) {
 
 <script src="{{ resource }}/harbor_file_pro/js/util.js"></script>
 <script src="{{ resource }}/harbor_file_pro/js/recovery.js"></script>
+<script src="{{ resource }}/harbor_file_pro/js/update.js"></script>
 <script src="{{ resource }}/harbor_file_pro/js/window-manager.js"></script>
 <script src="{{ resource }}/harbor_file_pro/js/document-windows.js"></script>
 <script src="{{ resource }}/harbor_file_pro/js/system-windows.js"></script>
@@ -401,20 +437,20 @@ window.HarborFile.tr = function (msgid) {
         <button id="fm_up" class="fm-tool-button" type="button" title="{{ _('Up') }}" aria-label="{{ _('Up') }}">
             <span class="fm-tool-image" style="--fm-icon:url('{{ resource }}/harbor_file_pro/icons/up.svg')" aria-hidden="true"></span>
         </button>
-        <button id="fm_refresh" class="fm-tool-button" type="button" title="{{ _('Refresh') }}" aria-label="{{ _('Refresh') }}">
-            <span class="fm-tool-image" style="--fm-icon:url('{{ resource }}/harbor_file_pro/icons/refresh.svg')" aria-hidden="true"></span>
-        </button>
-        <button id="fm_view" class="fm-tool-button" type="button" title="{{ _('View') }}" aria-label="{{ _('View') }}">
-            <span class="fm-tool-image" style="--fm-icon:url('{{ resource }}/harbor_file_pro/icons/view.svg')" aria-hidden="true"></span>
-        </button>
-        <button id="fm_settings" class="fm-tool-button" type="button" title="{{ _('Settings') }}" aria-label="{{ _('Settings') }}">
-            <span class="fm-tool-image" style="--fm-icon:url('{{ resource }}/harbor_file_pro/icons/settings.svg')" aria-hidden="true"></span>
-        </button>
-        <button id="fm_about" class="fm-tool-button" type="button" title="{{ _('About') }}" aria-label="{{ _('About') }}">
-            <span class="fm-tool-image" style="--fm-icon:url('{{ resource }}/harbor_file_pro/icons/about.svg')" aria-hidden="true"></span>
-        </button>
-        <div id="fm_address" class="fm-address"></div>
-        <button id="fm_favorites" class="fm-tool-button fm-favorites-button" type="button" title="{{ _('Favorites') }}" aria-label="{{ _('Favorites') }}">&#9733;</button>
+        <div id="fm_address" class="fm-address">
+            <div id="fm_address_body" class="fm-address-body"></div>
+            <button id="fm_address_star" class="fm-address-star" type="button">&#9734;</button>
+            <button id="fm_refresh" class="fm-tool-button" type="button" title="{{ _('Refresh') }}" aria-label="{{ _('Refresh') }}">
+                <span class="fm-tool-image" style="--fm-icon:url('{{ resource }}/harbor_file_pro/icons/refresh.svg')" aria-hidden="true"></span>
+            </button>
+        </div>
+        <div class="fm-toolbar-tools">
+            <span id="fm_select_count" class="fm-select-count"></span>
+            <button id="fm_select_mode" class="fm-tool-button fm-select-mode-btn" type="button" title="{{ _('Selection mode') }}" aria-label="{{ _('Selection mode') }}"><span id="fm_select_mode_icon">&#9744;</span></button>
+            <button id="fm_select_exit" class="fm-tool-button fm-select-exit-btn" type="button" title="{{ _('Exit selection mode') }}" aria-label="{{ _('Exit selection mode') }}" style="display:none">&#10005;</button>
+            <button id="fm_favorites" class="fm-tool-button fm-favorites-button" type="button" data-menu="fm_fav_panel" title="{{ _('Favorites') }}" aria-label="{{ _('Favorites') }}">&#9733;</button>
+            <button id="fm_more" class="fm-tool-button fm-more-button" type="button" data-menu="fm_more_menu" title="{{ _('More') }}" aria-label="{{ _('More') }}">&#8943;</button>
+        </div>
     </div>
 
     <div class="fm-layout">
@@ -448,7 +484,22 @@ window.HarborFile.tr = function (msgid) {
 
 <input id="fm_upload_input" type="file" multiple hidden style="display:none">
 
-    <div id="fm_fav_panel" class="fm-fav-panel"></div>
+    <div id="fm_fav_panel" class="fm-fav-panel" data-anchor-menu="fm_favorites"></div>
+
+<div id="fm_more_menu" class="fm-tool-dropdown" data-anchor-menu="fm_more">
+    <button id="fm_view" type="button">
+        <span class="fm-tool-dropdown-icon" style="--fm-icon:url('{{ resource }}/harbor_file_pro/icons/view.svg')" aria-hidden="true"></span>
+        <span>{{ _('View') }}</span>
+    </button>
+    <button id="fm_settings" type="button">
+        <span class="fm-tool-dropdown-icon" style="--fm-icon:url('{{ resource }}/harbor_file_pro/icons/settings.svg')" aria-hidden="true"></span>
+        <span>{{ _('Settings') }}</span>
+    </button>
+    <button id="fm_about" type="button">
+        <span class="fm-tool-dropdown-icon" style="--fm-icon:url('{{ resource }}/harbor_file_pro/icons/about.svg')" aria-hidden="true"></span>
+        <span>{{ _('About') }}</span>
+    </button>
+</div>
 
 <div id="fm_bookmark_menu" class="fm-context-menu">
     <button id="fm_menu_bookmark_open" type="button"><span>{{ _('Open') }}</span></button>
@@ -463,7 +514,7 @@ window.HarborFile.tr = function (msgid) {
         <span class="fm-menu-image" style="--fm-icon:url('{{ resource }}/harbor_file_pro/icons/open.svg')" aria-hidden="true"></span>
         <span>{{ _('Open') }}</span>
     </button>
-    <button id="fm_menu_open_binary" type="button">
+<button id="fm_menu_open_binary" type="button">
         <span class="fm-menu-image" style="--fm-icon:url('{{ resource }}/harbor_file_pro/icons/binary.svg')" aria-hidden="true"></span>
         <span>{{ _('Open hexadecimal') }}</span>
     </button>
@@ -635,6 +686,25 @@ window.HarborFile.tr = function (msgid) {
             <div>
                 <div class="fm-about-name">Harbor File Pro</div>
                 <div class="fm-about-subtitle">{{ _('Harbor File is a powerful OpenWrt file management plugin') }}</div>
+            </div>
+        </div>
+        <div class="fm-about-list fm-about-update">
+            <div class="fm-about-label">{{ _('Current version') }}</div>
+            <div class="fm-about-value" id="fm_about_version">-</div>
+            <div class="fm-about-label">{{ _('Latest version') }}</div>
+            <div class="fm-about-value">
+                <span id="fm_about_latest">…</span>
+                <button id="fm_update_start" class="fm-dialog-action primary" type="button" style="display:none">{{ _('Update now') }}</button>
+            </div>
+            <div class="fm-about-label">{{ _('Mirror') }}</div>
+            <div class="fm-about-value">
+                <select id="fm_update_mirror" class="fm-form-select fm-update-select">
+                    <option value="auto">{{ _('Auto') }}</option>
+                    <option value="gitee">Gitee</option>
+                    <option value="github">GitHub</option>
+                    <option value="gitlab">GitLab</option>
+                </select>
+                <button id="fm_update_check" class="fm-dialog-action" type="button">{{ _('Check for updates') }}</button>
             </div>
         </div>
         <div class="fm-about-card">
@@ -1017,6 +1087,37 @@ window.HarborFile.tr = function (msgid) {
     </div>
 </section>
 
+<section id="fm_openwith_dialog" class="fm-dialog" role="dialog" aria-modal="true" aria-labelledby="fm_openwith_title">
+    <div class="fm-dialog-header">
+        <div id="fm_openwith_title" class="fm-dialog-title">{{ _('Open with') }}</div>
+        <button class="fm-dialog-close" type="button" aria-label="{{ _('Close') }}">&times;</button>
+    </div>
+    <div class="fm-form-body">
+        <div class="fm-openwith-name"></div>
+        <button id="fm_openwith_text" class="fm-openwith-option" type="button">
+            <span class="fm-openwith-icon">&#128196;</span>
+            <span>{{ _('Text editor') }}</span>
+        </button>
+        <button id="fm_openwith_image" class="fm-openwith-option" type="button">
+            <span class="fm-openwith-icon">&#128444;</span>
+            <span>{{ _('Image viewer') }}</span>
+        </button>
+        <button id="fm_openwith_video" class="fm-openwith-option" type="button">
+            <span class="fm-openwith-icon">&#127916;</span>
+            <span>{{ _('Video player') }}</span>
+        </button>
+        <button id="fm_openwith_pdf" class="fm-openwith-option" type="button">
+            <span class="fm-openwith-icon">&#128209;</span>
+            <span>{{ _('PDF viewer') }}</span>
+        </button>
+        <button id="fm_openwith_hex" class="fm-openwith-option" type="button">
+            <span class="fm-openwith-icon">&#8983;</span>
+            <span>{{ _('Hex editor') }}</span>
+        </button>
+        <label class="fm-openwith-remember"><input id="fm_openwith_remember" type="checkbox">{{ _('Always open this file type this way') }}</label>
+    </div>
+</section>
+
 <section id="fm_target_dialog" class="fm-dialog fm-target-dialog" role="dialog" aria-modal="true" aria-labelledby="fm_target_title">
     <div class="fm-dialog-header">
         <div id="fm_target_title" class="fm-dialog-title">{{ _('Select destination folder') }}</div>
@@ -1122,6 +1223,7 @@ window.HarborFile.tr = function (msgid) {
     </div>
     <div class="fm-package-install-body">
         <div id="fm_package_install_status" class="fm-package-status">-</div>
+        <div id="fm_install_progress_wrap" class="fm-thumbnail-progress" style="display:none"><span id="fm_install_progress_bar"></span></div>
         <div class="fm-package-list">
             <div class="fm-package-label">{{ _('Name') }}</div><div id="fm_package_install_name" class="fm-package-value">-</div>
             <div class="fm-package-label">{{ _('Path') }}</div><div id="fm_package_install_path" class="fm-package-value">-</div>
@@ -1217,8 +1319,16 @@ window.HarborFile.tr = function (msgid) {
         for (var i = 0; i < view_buttons.length; i++) {
             view_buttons[i].classList.toggle('active', view_buttons[i].getAttribute('data-view') === HF.state.view_mode);
         }
-        var rect = this.getBoundingClientRect();
+        var rect = document.getElementById('fm_more').getBoundingClientRect();
         HF.show_context_menu('fm_view_menu', rect.left, rect.bottom + 4);
+    });
+    document.getElementById('fm_select_mode').addEventListener('click', function() {
+        HF.hide_context_menus();
+        HF.handle_selection_button();
+    });
+    document.getElementById('fm_select_exit').addEventListener('click', function() {
+        HF.hide_context_menus();
+        HF.exit_selection_mode();
     });
     document.getElementById('fm_settings').addEventListener('click', function() {
         HF.hide_context_menus();
@@ -1226,7 +1336,29 @@ window.HarborFile.tr = function (msgid) {
     });
     document.getElementById('fm_about').addEventListener('click', function() {
         HF.hide_context_menus();
+        var mirror_select = document.getElementById('fm_update_mirror');
+        mirror_select.value = HF.state.preferences.update_mirror || 'auto';
         HF.open_modal('fm_about_dialog');
+        HF.check_update();
+    });
+    var openwith_types = { fm_openwith_text: 'text', fm_openwith_image: 'image', fm_openwith_video: 'video', fm_openwith_pdf: 'pdf', fm_openwith_hex: 'hex' };
+    Object.keys(openwith_types).forEach(function(openwith_id) {
+        document.getElementById(openwith_id).addEventListener('click', function() {
+            var item = HF.state.openwith_item;
+            var open_type = openwith_types[openwith_id];
+            var remember = document.getElementById('fm_openwith_remember').checked;
+            HF.close_modal();
+            if (item) {
+                if (remember) { HF.remember_open_type(item, open_type); }
+                HF.open_item(item, open_type);
+            }
+        });
+    });
+    document.getElementById('fm_update_check').addEventListener('click', function() { HF.check_update(); });
+    document.getElementById('fm_update_start').addEventListener('click', function() { HF.start_update(); });
+    document.getElementById('fm_update_mirror').addEventListener('change', function() {
+        HF.reset_update_result();
+        HF.save_preferences({ section: 'basic', update_mirror: this.value }, '', null);
     });
     var view_buttons = document.querySelectorAll('#fm_view_menu [data-view]');
     for (var view_index = 0; view_index < view_buttons.length; view_index++) {
@@ -1473,10 +1605,13 @@ window.HarborFile.tr = function (msgid) {
     });
     document.getElementById('fm_content').addEventListener('mousedown', HF.start_marquee_selection);
     document.getElementById('fm_content').addEventListener('contextmenu', function(event) {
-        if (event.target.closest('.fm-item')) {
+        if (HF.event_on_item_content(event)) {
             return;
         }
         event.preventDefault();
+        if (!HF.blank_menu_allowed()) {
+            return;
+        }
         HF.state.context_item = null;
         var writable_page = HF.state.current && HF.state.current.kind === 'directory';
         var current_path = writable_page ? HF.state.current.path : '';
@@ -1537,10 +1672,7 @@ window.HarborFile.tr = function (msgid) {
         }
     });
 
-    document.getElementById('fm_favorites').addEventListener('click', function(event) {
-        event.stopPropagation();
-        HF.on_favorites_button(this);
-    });
+    HF.bind_toolbar_actions();
     document.getElementById('fm_bookmark_cancel').addEventListener('click', HF.close_modal);
     document.getElementById('fm_bookmark_folder').addEventListener('change', function() {
         var creating = this.value === '__new__';
@@ -1555,7 +1687,7 @@ window.HarborFile.tr = function (msgid) {
         var item = HF.state.bookmark_menu_item;
         if (!item) { return; }
         if (item.is_folder) { HF.open_bookmark_folder(item); return; }
-        HF.close_fav_panel(); HF.close_modal(); HF.open_path(item.path, true);
+        HF.close_anchor_menus(); HF.close_modal(); HF.open_path(item.path, true);
     });
     document.getElementById('fm_menu_bookmark_edit').addEventListener('click', function() {
         HF.hide_context_menus();
@@ -1589,7 +1721,6 @@ window.HarborFile.tr = function (msgid) {
     for (var close_index = 0; close_index < close_buttons.length; close_index++) {
         close_buttons[close_index].addEventListener('click', HF.close_modal);
     }
-    document.addEventListener('click', HF.hide_context_menus);
     document.addEventListener('dragend', HF.clear_drag_state);
     document.addEventListener('dragover', function(event) {
         if (HF.is_file_drag(event)) {
@@ -1635,25 +1766,11 @@ window.HarborFile.tr = function (msgid) {
         var multiTouch = false;
         var isScrolling = false;
         var scrollStartTop = 0;
-        var marqueeAccumulated = {};
-
-        function getScrollContainer() {
-            var node = content;
-            while (node && node !== document.body) {
-                var style = window.getComputedStyle(node);
-                if (/(auto|scroll)/.test(style.overflowY) &&
-                        node.scrollHeight > node.clientHeight) {
-                    return node;
-                }
-                node = node.parentElement;
-            }
-            return document.scrollingElement || document.documentElement;
-        }
 
         function startScroll(direction) {
             stopScroll();
             scrollInterval = setInterval(function() {
-                var scroller = getScrollContainer();
+                var scroller = HF.marquee_scroller();
                 scroller.scrollTop += direction * SCROLL_SPEED;
 
                 if (isSelecting) {
@@ -1675,99 +1792,7 @@ window.HarborFile.tr = function (msgid) {
             var touch = window._lastTouch;
             if (!touch) return;
 
-            updateMarqueeSelection(touch.clientX, touch.clientY);
-        }
-
-        function updateMarqueeSelection(cx, cy) {
-            if (!HF.state.selection_dragging) return;
-
-            var rect = HF.selection_rect(
-                HF.state.selection_start_x,
-                HF.state.selection_start_y,
-                cx,
-                cy
-            );
-
-            var width = rect.right - rect.left;
-            var height = rect.bottom - rect.top;
-
-            if (width > 3 || height > 3) {
-                HF.state.selection_moved = true;
-            }
-
-            var box = HF.ensure_selection_box();
-
-            box.style.display = HF.state.selection_moved ? 'block' : 'none';
-            box.style.left = rect.left + 'px';
-            box.style.top = rect.top + 'px';
-            box.style.width = width + 'px';
-            box.style.height = height + 'px';
-
-            if (!HF.state.selection_moved) return;
-
-            var selected = HF.state.selection_base.slice();
-            var seen = {};
-
-            selected.forEach(function(item) {
-                if (item && item.path) {
-                    seen[item.path] = true;
-                }
-            });
-
-            
-            for (var path in marqueeAccumulated) {
-                if (Object.prototype.hasOwnProperty.call(marqueeAccumulated, path) && !seen[path]) {
-                    selected.push(marqueeAccumulated[path]);
-                    seen[path] = true;
-                }
-            }
-
-            HF.rendered_file_items().forEach(function(entry) {
-                if (entry.node.offsetParent === null || seen[entry.item.path]) {
-                    return;
-                }
-
-                if (HF.rects_intersect(
-                    rect,
-                    entry.node.getBoundingClientRect()
-                )) {
-                    selected.push(entry.item);
-                    seen[entry.item.path] = true;
-                    marqueeAccumulated[entry.item.path] = entry.item;
-                }
-            });
-
-            HF.set_selected_items(
-                selected,
-                selected.length ? selected[selected.length - 1] : null,
-                HF.state.selection_anchor
-            );
-        }
-
-        function isInFolderContent(clientX, clientY) {
-            var target = document.elementFromPoint(clientX, clientY);
-            var item = target ? target.closest('.fm-item') : null;
-
-            if (item) {
-                var main = item.querySelector('.fm-item-main');
-
-                if (main) {
-                    var rect = main.getBoundingClientRect();
-
-                    if (
-                        clientX >= rect.left &&
-                        clientX <= rect.right &&
-                        clientY >= rect.top &&
-                        clientY <= rect.bottom
-                    ) {
-                        return true;
-                    }
-                } else {
-                    return true;
-                }
-            }
-
-            return false;
+            HF.apply_marquee_selection(touch.clientX, touch.clientY);
         }
 
         content.addEventListener('touchstart', function(e) {
@@ -1787,7 +1812,7 @@ window.HarborFile.tr = function (msgid) {
             touchStartTime = Date.now();
             touchStartX = touch.clientX;
             touchStartY = touch.clientY;
-            touchStartOnBlank = !isInFolderContent(
+            touchStartOnBlank = !HF.is_item_content_at(
                 touchStartX,
                 touchStartY
             );
@@ -1804,8 +1829,7 @@ window.HarborFile.tr = function (msgid) {
             isDragging = false;
             isSelecting = false;
             isScrolling = false;
-            scrollStartTop = getScrollContainer().scrollTop;
-            marqueeAccumulated = {};
+            scrollStartTop = HF.marquee_scroller().scrollTop;
 
             HF.state.selection_dragging = false;
             HF.state.selection_moved = false;
@@ -1819,8 +1843,7 @@ window.HarborFile.tr = function (msgid) {
                 HF.clear_selection();
             }
 
-            HF.state.selection_start_x = touchStartX;
-            HF.state.selection_start_y = touchStartY;
+            HF.snapshot_marquee_origin(touchStartX, touchStartY);
             HF.state.selection_anchor =
                 HF.state.selection_base.length
                     ? HF.state.selection_base[0]
@@ -1839,11 +1862,13 @@ window.HarborFile.tr = function (msgid) {
                     !HF.state.drag_item
                 ) {
                     isLongPress = true;
-                    HF.show_context_menu(
-                        'fm_blank_menu',
-                        touchStartX,
-                        touchStartY
-                    );
+                    if (HF.blank_menu_allowed()) {
+                        HF.show_context_menu(
+                            'fm_blank_menu',
+                            touchStartX,
+                            touchStartY
+                        );
+                    }
                 }
             }, 500);
         }, { passive: true });
@@ -1925,7 +1950,7 @@ window.HarborFile.tr = function (msgid) {
 
                     HF.ensure_selection_box();
 
-                    updateMarqueeSelection(
+                    HF.apply_marquee_selection(
                         touch.clientX,
                         touch.clientY
                     );
@@ -1943,7 +1968,7 @@ window.HarborFile.tr = function (msgid) {
             if (isScrolling) {
                 
                 e.preventDefault();
-                var scroller = getScrollContainer();
+                var scroller = HF.marquee_scroller();
                 scroller.scrollTop =
                     scrollStartTop + (touchStartY - touch.clientY);
                 return;
@@ -1960,7 +1985,7 @@ window.HarborFile.tr = function (msgid) {
                 longPressTimer = null;
             }
 
-            updateMarqueeSelection(
+            HF.apply_marquee_selection(
                 touch.clientX,
                 touch.clientY
             );
@@ -2044,14 +2069,6 @@ window.HarborFile.tr = function (msgid) {
             if (!restored) {
                 HF.show_virtual('quick_access', true);
             }
-            document.getElementById('fm_address').addEventListener('click', function(e) {
-                if (e.target.closest('.fm-crumb') || e.target.closest('.fm-address-star')) {
-                    return;
-                }
-                if (HF.state.current && HF.state.current.kind === 'directory' && !HF.state.address_editing) {
-                    HF.enter_address_edit();
-                }
-            });
         });
     });
 })(window.HarborFile);

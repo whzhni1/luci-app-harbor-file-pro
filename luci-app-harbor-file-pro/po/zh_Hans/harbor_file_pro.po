@@ -10,6 +10,9 @@ msgstr ""
 msgid "%s is not available on this system"
 msgstr "%s 在此系统上不可用"
 
+msgid "Always open this file type this way"
+msgstr "始终以此方式打开该类型文件"
+
 msgid "Another installation is already running"
 msgstr "已有另一个安装任务正在运行"
 
@@ -248,6 +251,9 @@ msgstr "剪切"
 msgid "Cut to clipboard"
 msgstr "已剪切到剪贴板"
 
+msgid "DE AD BE EF"
+msgstr "DE AD BE EF"
+
 msgid "Default configuration may keep upload and download limits. Recommended configuration can remove some limits."
 msgstr "默认配置可能保留上传和下载限制，推荐配置可以移除部分限制。"
 
@@ -262,6 +268,9 @@ msgstr "删除完成"
 
 msgid "Delete selected items?"
 msgstr "删除选中的项目？"
+
+msgid "Deselect all"
+msgstr "取消全选"
 
 msgid "Descending"
 msgstr "降序"
@@ -310,6 +319,9 @@ msgstr "错误"
 
 msgid "Exit code"
 msgstr "退出代码"
+
+msgid "Exit selection mode"
+msgstr "退出选择模式"
 
 msgid "Extract"
 msgstr "解压"
@@ -418,6 +430,9 @@ msgstr "无效的权限值"
 
 msgid "Invalid name"
 msgstr "无效的名称"
+
+msgid "Invalid offset"
+msgstr "无效的偏移量"
 
 msgid "Invalid path"
 msgstr "无效的路径"
@@ -617,6 +632,9 @@ msgstr "八进制"
 msgid "Offset"
 msgstr "偏移量"
 
+msgid "Offset, e.g. 0x1A2B or 6699"
+msgstr "偏移量，如 0x1A2B 或 6699"
+
 msgid "Open"
 msgstr "打开"
 
@@ -809,11 +827,17 @@ msgstr "搜索文本"
 msgid "Seconds"
 msgstr "秒"
 
+msgid "Select all"
+msgstr "全选"
+
 msgid "Select destination folder"
 msgstr "选择目标文件夹"
 
 msgid "Selected %d items"
 msgstr "已选中 %d 项"
+
+msgid "Selection mode"
+msgstr "选择模式"
 
 msgid "Service address"
 msgstr "服务地址"
@@ -1243,6 +1267,9 @@ msgstr "收藏夹"
 msgid "Move down"
 msgstr "下移"
 
+msgid "More"
+msgstr "更多"
+
 msgid "Move up"
 msgstr "上移"
 
@@ -1287,3 +1314,87 @@ msgstr "功能增强版"
 
 msgid "Harbor File Pro"
 msgstr "Harbor 文件管理 Pro"
+
+msgid "Current version"
+msgstr "当前版本"
+
+msgid "Latest version"
+msgstr "最新版本"
+
+msgid "Check for updates"
+msgstr "检查更新"
+
+msgid "Update now"
+msgstr "立即更新"
+
+msgid "Already up to date"
+msgstr "已是最新版本"
+
+msgid "Update available"
+msgstr "有可用更新"
+
+msgid "Version check failed"
+msgstr "版本检查失败"
+
+msgid "Mirror"
+msgstr "更新源"
+
+msgid "Auto"
+msgstr "自动"
+
+msgid "Downloading package"
+msgstr "正在下载软件包"
+
+msgid "Downloading language pack"
+msgstr "正在下载语言包"
+
+msgid "Installing update"
+msgstr "正在安装更新"
+
+msgid "Update finished, please refresh the page"
+msgstr "更新完成，请刷新页面"
+
+msgid "Open with"
+msgstr "打开方式"
+
+msgid "Text editor"
+msgstr "文本编辑器"
+
+msgid "Hex editor"
+msgstr "十六进制编辑器"
+
+msgid "Not a text file, opened in the hex editor"
+msgstr "该文件不是文本，已用十六进制编辑器打开"
+
+msgid "Go"
+msgstr "转到"
+
+msgid "Previous"
+msgstr "上一窗"
+
+msgid "Next"
+msgstr "下一窗"
+
+msgid "Found at"
+msgstr "找到于"
+
+msgid "Not found"
+msgstr "未找到"
+
+msgid "Image viewer"
+msgstr "图片查看器"
+
+msgid "Video player"
+msgstr "视频播放器"
+
+msgid "PDF viewer"
+msgstr "PDF 查看器"
+
+msgid "Replace hex, e.g. 00 00"
+msgstr "替换为十六进制，如 00 00"
+
+msgid "replaced"
+msgstr "处已替换"
+
+msgid "Replacing"
+msgstr "正在替换"

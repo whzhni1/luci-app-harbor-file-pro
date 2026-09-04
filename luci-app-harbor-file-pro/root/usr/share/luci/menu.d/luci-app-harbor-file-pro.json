@@ -546,5 +546,41 @@
 				"luci-app-harbor-file-pro"
 			]
 		}
+	},
+	"admin/harbor_pro/update_check": {
+		"action": {
+			"type": "function",
+			"module": "harborpro.update",
+			"function": "api_update_check"
+		},
+		"depends": {
+			"acl": [
+				"luci-app-harbor-file-pro"
+			]
+		}
+	},
+	"admin/harbor_pro/update_start": {
+		"action": {
+			"type": "function",
+			"module": "harborpro.update",
+			"function": "api_update_start"
+		},
+		"depends": {
+			"acl": [
+				"luci-app-harbor-file-pro"
+			]
+		}
+	},
+	"admin/harbor_pro/update_status": {
+		"action": {
+			"type": "function",
+			"module": "harborpro.update",
+			"function": "api_update_status"
+		},
+		"depends": {
+			"acl": [
+				"luci-app-harbor-file-pro"
+			]
+		}
 	}
 }

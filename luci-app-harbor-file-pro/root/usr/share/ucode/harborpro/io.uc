@@ -10,13 +10,15 @@ const open = _fs.open,
       stdout = _fs.stdout,
       basename = _fs.basename,
       rename = _fs.rename,
-      unlink = _fs.unlink;
+      unlink = _fs.unlink,
+      writefile = _fs.writefile;
 const _ubus = require('ubus');
 const connect = _ubus.connect;
 const _uci = require('uci');
 const cursor = _uci.cursor;
 
 const CHUNK = 65536;
+const REPLACE_PROG = '/tmp/harbor_file_pro_replace.progress';
 const SLICE_MAX = 1024 * 1024;
 
 const SYSTEM_FOLDER_ROOTS = [
@@ -438,6 +440,281 @@ function decode_needle(q, encoding) {
 	return out;
 }
 
+// Rewrite the byte range [start,end) with `repl` (in-memory string), via the
+// same streamed head/body/tail rewrite do_splice uses. Returns null on
+// success or an error string.
+function splice_string(path, st, start, end, repl) {
+	let tmp = path + '.harbor-replace';
+	let src = open(path, 'r');
+	let dst = open(tmp, 'w', st.mode & 0o7777);
+
+	if (!src || !dst) {
+		if (src) src.close();
+		if (dst) { dst.close(); unlink(tmp); }
+		return 'cannot open for writing';
+	}
+
+	let copied = 0, okay = true;
+	src.seek(0, 0);
+	while (copied < start && okay) {
+		let want = ((start - copied) < CHUNK) ? (start - copied) : CHUNK;
+		let buf = src.read(want);
+		if (!length(buf)) { okay = false; break; }
+		if (dst.write(buf) == null) okay = false;
+		copied += length(buf);
+	}
+
+	if (okay && length(repl) && dst.write(repl) == null)
+		okay = false;
+
+	if (okay) {
+		src.seek(end, 0);
+		while (true) {
+			let buf = src.read(CHUNK);
+			if (!length(buf))
+				break;
+			if (dst.write(buf) == null) { okay = false; break; }
+		}
+	}
+
+	dst.flush();
+	dst.close();
+	src.close();
+
+	if (!okay) {
+		unlink(tmp);
+		return 'rewrite failed';
+	}
+
+	if (!rename(tmp, path)) {
+		unlink(tmp);
+		return 'rename failed';
+	}
+
+	return null;
+}
+
+// Streamed whole-file replace-all for huge files: server-side scan collects
+// every match offset (numbers only, flat memory), then rewrites back-to-front
+// so earlier offsets stay valid. 1 TB costs the same as 1 KB.
+// ONE streaming pass over the file: copy bytes, swapping each match range
+// for the replacement. Progress is written every hit (i/total) so the
+// frontend can show a live percentage; memory stays flat for any file size.
+function rewrite_with_replacements(path, st, offsets, needle, repl, dst_path) {
+	let out_path = dst_path ?? path;
+	let tmp = out_path + '.harbor-replace';
+	let src = open(path, 'r');
+	let dst = open(tmp, 'w', st.mode & 0o7777);
+
+	if (!src || !dst) {
+		if (src) src.close();
+		if (dst) { dst.close(); unlink(tmp); }
+		return 'cannot open for writing';
+	}
+
+	let total = length(offsets);
+	let nlen = length(needle);
+	let src_at = 0, okay = true, out_at = 0;
+
+	for (let i = 0; i < total && okay; i++) {
+		let at = offsets[i];
+
+		while (src_at < at && okay) {
+			let want = ((at - src_at) < CHUNK) ? (at - src_at) : CHUNK;
+			let buf = src.read(want);
+			if (!length(buf)) { okay = false; break; }
+			if (dst.write(buf) == null) okay = false;
+			else { src_at += length(buf); out_at += length(buf); }
+		}
+
+		if (!okay)
+			break;
+
+		src.seek(at + nlen, 0);
+		src_at = at + nlen;
+		if (length(repl) && dst.write(repl) == null)
+			okay = false;
+		else
+			out_at += length(repl);
+
+		writefile(REPLACE_PROG, sprintf('%d %d', i + 1, total));
+	}
+
+	while (okay) {
+		let buf = src.read(CHUNK);
+		if (!length(buf))
+			break;
+		if (dst.write(buf) == null) { okay = false; break; }
+		out_at += length(buf);
+	}
+
+	dst.flush();
+	dst.close();
+	src.close();
+
+	if (!okay) {
+		unlink(tmp);
+		writefile(REPLACE_PROG, '0 0');
+		return 'rewrite failed';
+	}
+
+	if (!rename(tmp, out_path)) {
+		unlink(tmp);
+		return 'rename failed';
+	}
+
+	return null;
+}
+
+function stage_path(path) {
+	return path + '.harbor-stage';
+}
+
+function do_stage_commit(path) {
+	let sp = stage_path(path);
+
+	if (!stat(sp))
+		return json_reply('404 Not Found', { code: 1, message: 'no staged changes' });
+
+	if (!rename(sp, path))
+		return json_reply('500 Internal Server Error', { code: 1, message: 'commit failed' });
+
+	json_reply('200 OK', { code: 0, message: 'success', data: { path } });
+}
+
+function do_stage_discard(path) {
+	let sp = stage_path(path);
+
+	if (stat(sp))
+		unlink(sp);
+
+	json_reply('200 OK', { code: 0, message: 'success', data: { path } });
+}
+
+function do_replace_all(path, params) {
+	// Staged mode: rewrite SRC into path+'.harbor-stage' instead of the real
+	// file, so the frontend can show the result and only commit on Save.
+	// SRC must be the file itself or its own stage -- never arbitrary.
+	let staging = (params.stage == '1');
+	let src_path = path;
+	let dst_path = null;
+
+	if (staging) {
+		dst_path = stage_path(path);
+		let src = normalize_path(params.src ?? path);
+
+		if (src != path && src != dst_path)
+			return json_reply('400 Bad Request', { code: 1, message: 'invalid source' });
+
+		src_path = src;
+
+		if (src == dst_path && !stat(dst_path))
+			return json_reply('404 Not Found', { code: 1, message: 'staged source missing' });
+	}
+
+	let st = stat(src_path);
+	if (!st || st.type != 'file')
+		fail('400 Bad Request', 'not a regular file');
+
+	let needle = decode_needle(params.q ?? '', params.encoding ?? 'text');
+	let repl = decode_needle(params.r ?? '', params.rencoding ?? params.encoding ?? 'text');
+
+	if (needle == null || length(needle) == 0)
+		return json_reply('400 Bad Request', { code: 1, message: 'empty or malformed pattern' });
+
+	if (length(needle) > 4096 || length(repl) > 65536)
+		return json_reply('400 Bad Request', { code: 1, message: 'pattern too long' });
+
+	let icase = (params.ignorecase == '1');
+	let cmp_needle = icase ? lc(needle) : needle;
+	let overlap = length(cmp_needle) - 1;
+
+	// pagination loop reusing do_search's proven carry scan
+	let offsets = [];
+	let cursor = 0;
+	let size = st.size ?? 0;
+
+	while (cursor < size) {
+		let fd = open(src_path, 'r');
+		if (!fd)
+			return json_reply('403 Forbidden', { code: 1, message: 'cannot open file' });
+
+		let matches = [];
+		let carry = '';
+		let carry_pos = cursor;
+		let pos = cursor;
+
+		fd.seek(cursor, 0);
+
+		while (length(matches) < 1000) {
+			let buf = fd.read(CHUNK);
+			if (!length(buf))
+				break;
+
+			let hay = carry + buf;
+			let hay_cmp = icase ? lc(hay) : hay;
+			let base = carry_pos;
+			let from = 0;
+
+			while (length(matches) < 1000) {
+				let idx = index(substr(hay_cmp, from), cmp_needle);
+				if (idx < 0)
+					break;
+				let absolute = base + from + idx;
+				if (absolute >= cursor)
+					push(matches, absolute);
+				from += idx + 1;
+			}
+
+			pos = base + length(hay);
+			carry = (overlap > 0) ? substr(hay, -overlap) : '';
+			carry_pos = pos - length(carry);
+		}
+
+		fd.close();
+
+		for (let m in matches)
+			push(offsets, m);
+
+		if (!length(matches))
+			break;
+		let last = matches[length(matches) - 1];
+		cursor = (length(matches) >= 1000) ? last + 1 : size;
+	}
+
+	if (!length(offsets))
+		return json_reply('200 OK', { code: 0, message: 'success',
+			data: { path, replaced: 0, size } });
+
+	let rv = rewrite_with_replacements(src_path, st, offsets, needle, repl, dst_path);
+	if (rv)
+		return json_reply('500 Internal Server Error', { code: 1, message: rv });
+
+	let nst = stat(dst_path ?? path);
+	json_reply('200 OK', { code: 0, message: 'success',
+		data: {
+			path,
+			replaced: length(offsets),
+			size: nst?.size ?? size,
+			staged: staging ? dst_path : null
+		} });
+}
+
+function do_replace_progress(path, params) {
+	let raw = trim(readfile(REPLACE_PROG) ?? '');
+	let done = 0, total = 0;
+
+	let m = match(raw, /^([0-9]+) ([0-9]+)$/);
+	if (m) {
+		done = +m[1];
+		total = +m[2];
+	}
+
+	json_reply('200 OK', { code: 0, message: 'success', data: {
+		path, done, total
+	}});
+}
+
 function do_search(path, params) {
 	let st = stat(path);
 	if (!st || st.type != 'file')
@@ -471,9 +748,23 @@ function do_search(path, params) {
 	let carry = '';
 	let carry_pos = start;
 
-	fd.seek(start, 0);
+	// Reverse navigation windows: last=1 returns the FINAL `limit` matches of
+	// the file; before=X returns the final `limit` matches strictly below X.
+	// `below` (how many matches precede the window) lets the client compute
+	// absolute numbering; total always counts the whole file.
+	let last_mode = (params.last == '1');
+	let before = +(params.before ?? -1);
+	if (before != before || before < -1)
+		before = -1;
+	let window_mode = last_mode || before >= 0;
 
-	while (length(matches) < limit) {
+	fd.seek(start, 0);
+	let total = 0;
+	let capped = false;
+	let accepted = 0;
+	let window = [];
+
+	while (true) {
 		let buf = fd.read(CHUNK);
 		if (!length(buf))
 			break;
@@ -483,11 +774,35 @@ function do_search(path, params) {
 		let base = carry_pos;
 		let from = 0;
 
-		while (length(matches) < limit) {
+		while (true) {
 			let idx = index(substr(hay_cmp, from), cmp_needle);
 			if (idx < 0)
 				break;
-			push(matches, base + from + idx);
+			total++;
+			let at = base + from + idx;
+			let keep = (!window_mode && !capped && length(matches) < limit);
+			let win = (window_mode && at >= start && (last_mode || at < before));
+			if (win) {
+				push(window, at);
+				accepted++;
+				if (length(window) > limit)
+					window = slice(window, length(window) - limit);
+			}
+			if (keep)
+				push(matches, at);
+			if (!window_mode && !capped && length(matches) >= limit) {
+				capped = true;
+				let rest = from + 1;
+				while (true) {
+					let more = index(substr(hay_cmp, rest), cmp_needle);
+					if (more < 0)
+						break;
+					total++;
+					rest += more + 1;
+				}
+				from = length(hay_cmp);
+				break;
+			}
 			from += idx + 1;
 		}
 
@@ -496,17 +811,33 @@ function do_search(path, params) {
 		carry_pos = pos - length(carry);
 	}
 
-	let done = (pos >= st.size);
 	fd.close();
+
+	if (window_mode) {
+		json_reply('200 OK', { code: 0, message: 'success', data: {
+			path,
+			matches: window,
+			count: length(window),
+			total,
+			below: accepted - length(window),
+			first: length(window) ? window[0] : null,
+			next: null,
+			scanned_to: pos,
+			size: st.size,
+			done: true
+		}});
+		return;
+	}
 
 	json_reply('200 OK', { code: 0, message: 'success', data: {
 		path,
 		matches,
 		count: length(matches),
-		next: (length(matches) >= limit && !done) ? (matches[length(matches) - 1] + 1) : null,
+		total,
+		next: capped ? (matches[length(matches) - 1] + 1) : null,
 		scanned_to: pos,
 		size: st.size,
-		done
+		done: true
 	}});
 }
 
@@ -518,7 +849,7 @@ function main() {
 	if (!path)
 		fail('400 Bad Request', 'invalid path');
 
-	let writing = (mode == 'patch' || mode == 'splice');
+	let writing = (mode == 'patch' || mode == 'splice' || mode == 'replace_all' || mode == 'stage_commit' || mode == 'stage_discard');
 
 	let sid = session_id(params);
 	let reason = authorize(sid, path, writing ? 'write' : 'read');
@@ -551,7 +882,11 @@ function main() {
 		mode = 'inline';
 	}
 
-	if (mode == 'patch')  return do_patch(path, params);
+	if (mode == 'patch')       return do_patch(path, params);
+	if (mode == 'replace_all')     return do_replace_all(path, params);
+	if (mode == 'stage_commit')    return do_stage_commit(path);
+	if (mode == 'stage_discard')   return do_stage_discard(path);
+	if (mode == 'replace_progress') return do_replace_progress(path, params);
 	if (mode == 'splice') return do_splice(path, params);
 	if (mode == 'search') return do_search(path, params);
 
