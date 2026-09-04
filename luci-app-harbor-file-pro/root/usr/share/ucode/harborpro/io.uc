@@ -425,6 +425,30 @@ function do_splice(path, params) {
 	}});
 }
 
+// Binary-safe lowercase.
+//
+// The lc() shipped with the ucode builds in current OpenWrt releases converts
+// its argument with ucv_to_string() and re-wraps the result with
+// ucv_string_new(), whose strlen() TRUNCATES the value at the first embedded
+// NUL byte. Case-insensitive scanning of binary data therefore silently
+// collapsed both the needle and every 64 KiB haystack chunk at their first
+// 0x00, which made hex search report nonsense counts (searching 00 matched the
+// empty string at every offset, searching D8 lost almost every hit).
+//
+// Splitting on NUL, folding each piece and re-joining keeps the byte length
+// and every NUL exactly where it was, on old and new ucode alike.
+function lc_bytes(s) {
+	if (index(s, '\0') < 0)
+		return lc(s);
+
+	let parts = split(s, '\0');
+
+	for (let i = 0; i < length(parts); i++)
+		parts[i] = lc(parts[i]);
+
+	return join('\0', parts);
+}
+
 function decode_needle(q, encoding) {
 	if (encoding != 'hex')
 		return q;
@@ -625,8 +649,11 @@ function do_replace_all(path, params) {
 	if (length(needle) > 4096 || length(repl) > 65536)
 		return json_reply('400 Bad Request', { code: 1, message: 'pattern too long' });
 
-	let icase = (params.ignorecase == '1');
-	let cmp_needle = icase ? lc(needle) : needle;
+	// Case folding is only meaningful for text needles. For a hex needle the
+	// bytes are literal, so folding would make 0x41 match 0x61 and report a
+	// different count depending on the "Match case" checkbox.
+	let icase = (params.ignorecase == '1' && (params.encoding ?? 'text') != 'hex');
+	let cmp_needle = icase ? lc_bytes(needle) : needle;
 	let overlap = length(cmp_needle) - 1;
 
 	// pagination loop reusing do_search's proven carry scan
@@ -652,7 +679,7 @@ function do_replace_all(path, params) {
 				break;
 
 			let hay = carry + buf;
-			let hay_cmp = icase ? lc(hay) : hay;
+			let hay_cmp = icase ? lc_bytes(hay) : hay;
 			let base = carry_pos;
 			let from = 0;
 
@@ -735,8 +762,11 @@ function do_search(path, params) {
 	if (limit != limit || limit < 1) limit = 100;
 	if (limit > 1000) limit = 1000;
 
-	let icase = (params.ignorecase == '1');
-	let cmp_needle = icase ? lc(needle) : needle;
+	// Case folding is only meaningful for text needles. For a hex needle the
+	// bytes are literal, so folding would make 0x41 match 0x61 and report a
+	// different count depending on the "Match case" checkbox.
+	let icase = (params.ignorecase == '1' && (params.encoding ?? 'text') != 'hex');
+	let cmp_needle = icase ? lc_bytes(needle) : needle;
 
 	let fd = open(path, 'r');
 	if (!fd)
@@ -770,7 +800,7 @@ function do_search(path, params) {
 			break;
 
 		let hay = carry + buf;
-		let hay_cmp = icase ? lc(hay) : hay;
+		let hay_cmp = icase ? lc_bytes(hay) : hay;
 		let base = carry_pos;
 		let from = 0;
 
