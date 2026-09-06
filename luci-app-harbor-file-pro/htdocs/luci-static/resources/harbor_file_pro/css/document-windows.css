@@ -499,6 +499,9 @@
     white-space: nowrap;
     user-select: none;
 }
+.fm-editor-search-option:has(input:disabled){
+    opacity: 0.45;
+}
 
 .fm-editor-replace-action{
     display: inline-flex;

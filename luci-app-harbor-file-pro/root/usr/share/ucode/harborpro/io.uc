@@ -18,6 +18,10 @@ const _uci = require('uci');
 const cursor = _uci.cursor;
 
 const CHUNK = 65536;
+
+// A regex match has no fixed length, so the tail carried across chunks is a
+// flat budget instead of needle-1; matches longer than this are not found.
+const REGEX_CARRY = 16384;
 const REPLACE_PROG = '/tmp/harbor_file_pro_replace.progress';
 const SLICE_MAX = 1024 * 1024;
 
@@ -425,6 +429,144 @@ function do_splice(path, params) {
 	}});
 }
 
+// ucode compiles dynamic patterns with POSIX ERE.  Perl classes are silently
+// ignored there (regexp("\\d{3}") matches nothing at all), so map the few that
+// have an exact ERE equivalent and refuse the rest instead of pretending.
+const RE_CLASSES = {
+	d: '[0-9]', D: '[^0-9]',
+	w: '[A-Za-z0-9_]', W: '[^A-Za-z0-9_]',
+	s: '[ \t\r\n\f\v]', S: '[^ \t\r\n\f\v]'
+};
+
+function re_error(pattern) {
+	if (index(pattern, chr(0)) >= 0)
+		return 'pattern must not contain a NUL byte';
+
+	for (let i = 0; i + 1 < length(pattern); i++) {
+		if (ord(substr(pattern, i, 1)) != 0x5c)
+			continue;
+
+		let c = substr(pattern, i + 1, 1);
+		let o = ord(c);
+
+		if (RE_CLASSES[c] == null && ((o >= 48 && o <= 57) || (o >= 65 && o <= 90) || (o >= 97 && o <= 122)))
+			return 'unsupported escape \\' + c;
+
+		i++;
+	}
+
+	if (index(pattern, '(?') >= 0)
+		return 'group extensions like (? are not supported';
+
+	return null;
+}
+
+function ere_translate(pattern) {
+	let out = '';
+
+	for (let i = 0; i < length(pattern); i++) {
+		if (ord(substr(pattern, i, 1)) != 0x5c || i + 1 >= length(pattern)) {
+			out += substr(pattern, i, 1);
+			continue;
+		}
+
+		let c = substr(pattern, i + 1, 1);
+		out += RE_CLASSES[c] != null ? RE_CLASSES[c] : ('\\' + c);
+		i++;
+	}
+
+	return out;
+}
+
+// regexec stops at the first NUL, so binary data is matched segment by segment
+// while the offsets stay absolute.  ucode exposes no match indices, but split()
+// hands out the pieces between matches, so the offsets are reconstructed from
+// their lengths -- and a pattern able to match the empty string shows up as a
+// piece count that does not add up.
+function regex_scan(hay, base, re_all, re_one) {
+	let out = [], at = 0;
+	let segs = split(hay, chr(0));
+
+	for (let i = 0; i < length(segs); i++) {
+		let hits = match(segs[i], re_all);
+		let parts = split(segs[i], re_one);
+
+		if (hits == null) {
+			at += length(segs[i]);
+		} else {
+			if (length(parts) != length(hits) + 1)
+				return null;
+
+			for (let k = 0; k < length(hits); k++) {
+				at += length(parts[k]);
+				push(out, [ base + at, length(hits[k][0]) ]);
+				at += length(hits[k][0]);
+			}
+
+			at += length(parts[length(hits)]);
+		}
+
+		if (i + 1 < length(segs))
+			at += 1;
+	}
+
+	return out;
+}
+
+const RE_EMPTY_MSG = 'pattern may match an empty string';
+
+// Shared by search and replace-all: the same engine, the same refusals.
+function compile_regex(needle, enc, icase) {
+	if (enc == 'hex')
+		return { error: 'regex needs text encoding' };
+
+	let why = re_error(needle);
+
+	if (why)
+		return { error: why };
+
+	try {
+		let src = ere_translate(needle);
+		return {
+			all: regexp(src, 'g' + (icase ? 'i' : '')),
+			one: regexp(src, icase ? 'i' : '')
+		};
+	} catch (e) {
+		return { error: 'invalid pattern' };
+	}
+}
+
+// The fold must never change the byte count, or the offsets we report into the
+// raw file drift (and replace-all rewrites unrelated bytes).  ucode's lc()
+// drops the NULs that file data is full of, so instead of giving up on the whole
+// 64 KiB chunk the haystack is folded NUL-free segment by NUL-free segment --
+// split() keeps the NULs, so the offsets stay absolute.  A segment whose fold
+// still changes length is matched exactly rather than approximately.
+function fold_segments(hay, base, needle, icase) {
+	let out = [];
+
+	if (!icase) {
+		push(out, [ hay, base, needle ]);
+		return out;
+	}
+
+	let f_needle = lc(needle);
+	let fold_needle = length(f_needle) == length(needle);
+	let segs = split(hay, chr(0));
+	let at = base;
+
+	for (let i = 0; i < length(segs); i++) {
+		let seg = segs[i];
+		let f_seg = lc(seg);
+		let safe = fold_needle && length(f_seg) == length(seg);
+
+		push(out, [ safe ? f_seg : seg, at, safe ? f_needle : needle ]);
+		at += length(seg) + 1;
+	}
+
+	return out;
+}
+
 function decode_needle(q, encoding) {
 	if (encoding != 'hex')
 		return q;
@@ -436,6 +578,9 @@ function decode_needle(q, encoding) {
 	let out = '';
 	for (let i = 0; i < length(clean); i += 2)
 		out += chr(hex(substr(clean, i, 2)));
+
+	if (length(out) * 2 != length(clean))
+		return null;
 
 	return out;
 }
@@ -500,7 +645,7 @@ function splice_string(path, st, start, end, repl) {
 // ONE streaming pass over the file: copy bytes, swapping each match range
 // for the replacement. Progress is written every hit (i/total) so the
 // frontend can show a live percentage; memory stays flat for any file size.
-function rewrite_with_replacements(path, st, offsets, needle, repl, dst_path) {
+function rewrite_with_replacements(path, st, offsets, needle, repl, dst_path, lens) {
 	let out_path = dst_path ?? path;
 	let tmp = out_path + '.harbor-replace';
 	let src = open(path, 'r');
@@ -513,11 +658,12 @@ function rewrite_with_replacements(path, st, offsets, needle, repl, dst_path) {
 	}
 
 	let total = length(offsets);
-	let nlen = length(needle);
 	let src_at = 0, okay = true, out_at = 0;
 
 	for (let i = 0; i < total && okay; i++) {
 		let at = offsets[i];
+
+		let nlen = (lens != null) ? lens[i] : length(needle);
 
 		while (src_at < at && okay) {
 			let want = ((at - src_at) < CHUNK) ? (at - src_at) : CHUNK;
@@ -616,8 +762,35 @@ function do_replace_all(path, params) {
 	if (!st || st.type != 'file')
 		fail('400 Bad Request', 'not a regular file');
 
-	let needle = decode_needle(params.q ?? '', params.encoding ?? 'text');
-	let repl = decode_needle(params.r ?? '', params.rencoding ?? params.encoding ?? 'text');
+	let enc = params.encoding ?? 'text';
+
+	// One known range ("replace this hit only") needs no scan at all: the
+	// frontend already knows where the match is and how long it was.
+	let range = params.range != null ? split(params.range, ':') : null;
+
+	if (range != null && length(range) == 2) {
+		let at = +range[0];
+		let len = +range[1];
+
+		if (at != at || len != len || at < 0 || len < 0 || at + len > (st.size ?? 0))
+			return json_reply('400 Bad Request', { code: 1, message: 'invalid range' });
+
+		let rvalue = decode_needle(params.r ?? '', params.rencoding ?? enc);
+
+		if (rvalue == null || length(rvalue) > 65536)
+			return json_reply('400 Bad Request', { code: 1, message: 'empty or malformed pattern' });
+
+		if (rewrite_with_replacements(src_path, st, [ at ], '', rvalue, dst_path, [ len ]))
+			return json_reply('500 Internal Server Error', { code: 1, message: 'rewrite failed' });
+
+		let rst = stat(dst_path ?? path);
+		return json_reply('200 OK', { code: 0, message: 'success', data: {
+			path, replaced: 1, size: rst?.size ?? st.size, staged: staging ? dst_path : null
+		} });
+	}
+
+	let needle = decode_needle(params.q ?? '', enc);
+	let repl = decode_needle(params.r ?? '', params.rencoding ?? enc);
 
 	if (needle == null || length(needle) == 0)
 		return json_reply('400 Bad Request', { code: 1, message: 'empty or malformed pattern' });
@@ -625,12 +798,19 @@ function do_replace_all(path, params) {
 	if (length(needle) > 4096 || length(repl) > 65536)
 		return json_reply('400 Bad Request', { code: 1, message: 'pattern too long' });
 
-	let icase = (params.ignorecase == '1');
-	let cmp_needle = icase ? lc(needle) : needle;
-	let overlap = length(cmp_needle) - 1;
+	let icase = (params.ignorecase == '1') && enc != 'hex';
+
+	let rgx = params.regex == '1' ? compile_regex(needle, enc, icase) : null;
+
+	if (rgx != null && rgx.error != null)
+		return json_reply('400 Bad Request', { code: 1, message: rgx.error });
+
+	// a regex hit has no fixed length, so lengths travel alongside the offsets
+	let overlap = rgx != null ? REGEX_CARRY : length(needle) - 1;
 
 	// pagination loop reusing do_search's proven carry scan
 	let offsets = [];
+	let match_lens = rgx != null ? [] : null;
 	let cursor = 0;
 	let size = st.size ?? 0;
 
@@ -640,9 +820,11 @@ function do_replace_all(path, params) {
 			return json_reply('403 Forbidden', { code: 1, message: 'cannot open file' });
 
 		let matches = [];
+		let lens = rgx != null ? [] : null;
 		let carry = '';
 		let carry_pos = cursor;
 		let pos = cursor;
+		let min_start = 0;
 
 		fd.seek(cursor, 0);
 
@@ -652,18 +834,48 @@ function do_replace_all(path, params) {
 				break;
 
 			let hay = carry + buf;
-			let hay_cmp = icase ? lc(hay) : hay;
 			let base = carry_pos;
-			let from = 0;
 
-			while (length(matches) < 1000) {
-				let idx = index(substr(hay_cmp, from), cmp_needle);
-				if (idx < 0)
-					break;
-				let absolute = base + from + idx;
-				if (absolute >= cursor)
-					push(matches, absolute);
-				from += idx + 1;
+			if (rgx != null) {
+				let found = regex_scan(hay, base, rgx.all, rgx.one);
+				if (found == null) {
+					fd.close();
+					return json_reply('400 Bad Request', { code: 1, message: RE_EMPTY_MSG });
+				}
+
+				for (let i = 0; i < length(found) && length(matches) < 1000; i++) {
+					let at = found[i][0];
+
+					if (at < min_start)
+						continue;
+
+					min_start = at + found[i][1];
+
+					if (at >= cursor) {
+						push(matches, at);
+						push(lens, found[i][1]);
+					}
+				}
+			} else {
+				let subs = fold_segments(hay, base, needle, icase);
+
+				for (let s = 0; s < length(subs) && length(matches) < 1000; s++) {
+					let from = 0;
+
+					while (length(matches) < 1000) {
+						let idx = index(substr(subs[s][0], from), subs[s][2]);
+						if (idx < 0)
+							break;
+						let absolute = subs[s][1] + from + idx;
+						if (absolute >= cursor) {
+							push(matches, absolute);
+
+							if (lens != null)
+								push(lens, length(needle));
+						}
+						from += idx + 1;
+					}
+				}
 			}
 
 			pos = base + length(hay);
@@ -673,8 +885,12 @@ function do_replace_all(path, params) {
 
 		fd.close();
 
-		for (let m in matches)
-			push(offsets, m);
+		for (let i = 0; i < length(matches); i++) {
+			push(offsets, matches[i]);
+
+			if (match_lens != null)
+				push(match_lens, lens[i]);
+		}
 
 		if (!length(matches))
 			break;
@@ -686,7 +902,7 @@ function do_replace_all(path, params) {
 		return json_reply('200 OK', { code: 0, message: 'success',
 			data: { path, replaced: 0, size } });
 
-	let rv = rewrite_with_replacements(src_path, st, offsets, needle, repl, dst_path);
+	let rv = rewrite_with_replacements(src_path, st, offsets, needle, repl, dst_path, match_lens);
 	if (rv)
 		return json_reply('500 Internal Server Error', { code: 1, message: rv });
 
@@ -715,12 +931,44 @@ function do_replace_progress(path, params) {
 	}});
 }
 
+function search_take(acc, at, len) {
+	if (at < acc.min_start)
+		return;
+
+	acc.total++;
+
+	if (acc.capped)
+		return;
+
+	if (acc.window_mode) {
+		if (at >= acc.start && (acc.last_mode || at < acc.before)) {
+			push(acc.window, at);
+			push(acc.wlens, len);
+			acc.accepted++;
+
+			if (length(acc.window) > acc.limit) {
+				acc.window = slice(acc.window, length(acc.window) - acc.limit);
+				acc.wlens = slice(acc.wlens, length(acc.wlens) - acc.limit);
+			}
+		}
+
+		return;
+	}
+
+	push(acc.matches, at);
+	push(acc.mlens, len);
+
+	if (length(acc.matches) >= acc.limit)
+		acc.capped = true;
+}
+
 function do_search(path, params) {
 	let st = stat(path);
 	if (!st || st.type != 'file')
 		fail('400 Bad Request', 'not a regular file');
 
-	let needle = decode_needle(params.q ?? '', params.encoding ?? 'text');
+	let enc = params.encoding ?? 'text';
+	let needle = decode_needle(params.q ?? '', enc);
 
 	if (needle == null || length(needle) == 0)
 		return json_reply('400 Bad Request', { code: 1, message: 'empty or malformed pattern' });
@@ -735,16 +983,22 @@ function do_search(path, params) {
 	if (limit != limit || limit < 1) limit = 100;
 	if (limit > 1000) limit = 1000;
 
-	let icase = (params.ignorecase == '1');
-	let cmp_needle = icase ? lc(needle) : needle;
+	let icase = (params.ignorecase == '1') && enc != 'hex';
+
+	let rgx = params.regex == '1' ? compile_regex(needle, enc, icase) : null;
+
+	if (rgx != null && rgx.error != null)
+		return json_reply('400 Bad Request', { code: 1, message: rgx.error });
+
+	let re_all = rgx != null ? rgx.all : null;
+	let re_one = rgx != null ? rgx.one : null;
 
 	let fd = open(path, 'r');
 	if (!fd)
 		return json_reply('403 Forbidden', { code: 1, message: 'cannot open file' });
 
-	let overlap = length(needle) - 1;
+	let overlap = re_all != null ? REGEX_CARRY : length(needle) - 1;
 	let pos = start;
-	let matches = [];
 	let carry = '';
 	let carry_pos = start;
 
@@ -759,10 +1013,12 @@ function do_search(path, params) {
 	let window_mode = last_mode || before >= 0;
 
 	fd.seek(start, 0);
-	let total = 0;
-	let capped = false;
-	let accepted = 0;
-	let window = [];
+
+	let acc = {
+		total: 0, accepted: 0, capped: false, matches: [], mlens: [], window: [], wlens: [],
+		limit: limit, start: start, before: before, last_mode: last_mode, window_mode: window_mode,
+		regex: re_all != null, min_start: 0
+	};
 
 	while (true) {
 		let buf = fd.read(CHUNK);
@@ -770,40 +1026,35 @@ function do_search(path, params) {
 			break;
 
 		let hay = carry + buf;
-		let hay_cmp = icase ? lc(hay) : hay;
 		let base = carry_pos;
-		let from = 0;
 
-		while (true) {
-			let idx = index(substr(hay_cmp, from), cmp_needle);
-			if (idx < 0)
-				break;
-			total++;
-			let at = base + from + idx;
-			let keep = (!window_mode && !capped && length(matches) < limit);
-			let win = (window_mode && at >= start && (last_mode || at < before));
-			if (win) {
-				push(window, at);
-				accepted++;
-				if (length(window) > limit)
-					window = slice(window, length(window) - limit);
+		if (acc.regex) {
+			let found = regex_scan(hay, base, re_all, re_one);
+			if (found == null) {
+				fd.close();
+				return json_reply('400 Bad Request', { code: 1, message: RE_EMPTY_MSG });
 			}
-			if (keep)
-				push(matches, at);
-			if (!window_mode && !capped && length(matches) >= limit) {
-				capped = true;
-				let rest = from + 1;
+
+			for (let i = 0; i < length(found); i++) {
+				search_take(acc, found[i][0], found[i][1]);
+
+				if (!acc.window_mode)
+					acc.min_start = found[i][0] + found[i][1];
+			}
+		} else {
+			let subs = fold_segments(hay, base, needle, icase);
+
+			for (let s = 0; s < length(subs); s++) {
+				let from = 0;
+
 				while (true) {
-					let more = index(substr(hay_cmp, rest), cmp_needle);
-					if (more < 0)
+					let idx = index(substr(subs[s][0], from), subs[s][2]);
+					if (idx < 0)
 						break;
-					total++;
-					rest += more + 1;
+					search_take(acc, subs[s][1] + from + idx, length(needle));
+					from += idx + 1;
 				}
-				from = length(hay_cmp);
-				break;
 			}
-			from += idx + 1;
 		}
 
 		pos = base + length(hay);
@@ -816,11 +1067,11 @@ function do_search(path, params) {
 	if (window_mode) {
 		json_reply('200 OK', { code: 0, message: 'success', data: {
 			path,
-			matches: window,
-			count: length(window),
-			total,
-			below: accepted - length(window),
-			first: length(window) ? window[0] : null,
+			matches: acc.window,
+			count: length(acc.window),
+			total: acc.total,
+			below: acc.accepted - length(acc.window),
+			first: length(acc.window) ? acc.window[0] : null,
 			next: null,
 			scanned_to: pos,
 			size: st.size,
@@ -831,10 +1082,11 @@ function do_search(path, params) {
 
 	json_reply('200 OK', { code: 0, message: 'success', data: {
 		path,
-		matches,
-		count: length(matches),
-		total,
-		next: capped ? (matches[length(matches) - 1] + 1) : null,
+		matches: acc.matches,
+		count: length(acc.matches),
+		total: acc.total,
+		lengths: acc.regex ? acc.mlens : null,
+		next: acc.capped ? (acc.matches[length(acc.matches) - 1] + 1) : null,
 		scanned_to: pos,
 		size: st.size,
 		done: true

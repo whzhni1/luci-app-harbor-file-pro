@@ -228,6 +228,9 @@
                     manager.keyboard_scroll_suppressed_until = Date.now() + 700;
                 }, { passive: true });
             }
+            this.taskbar_pill.addEventListener('mouseenter', function() {
+                manager.set_taskbar_revealed(true);
+            });
             this.taskbar.addEventListener('mouseenter', function() {
                 manager.taskbar_interacting = true;
                 manager.set_taskbar_revealed(true);
@@ -345,7 +348,8 @@
         DesktopWindowManager.prototype.preferred_size = function(record, measured) {
             var fallback_width = Number(record.options.width || measured.width || 680);
             var fallback_height = Number(record.options.height || measured.height || 440);
-            if (record.options.persistSize === false || !HF.state || !HF.state.preferences) {
+            if (record.options.persistSize === false && !this.prefers_configured_size(record) ||
+                !HF.state || !HF.state.preferences) {
                 return { width: fallback_width, height: fallback_height };
             }
             var compact = this.is_compact();
@@ -382,6 +386,10 @@
                 }, '', null, function() {
                 });
             }, 420);
+        };
+
+        DesktopWindowManager.prototype.prefers_configured_size = function(record) {
+            return !!(record && record.element && record.element.classList.contains('fm-pref-sized-dialog'));
         };
 
         DesktopWindowManager.prototype.initial_rect = function(record) {

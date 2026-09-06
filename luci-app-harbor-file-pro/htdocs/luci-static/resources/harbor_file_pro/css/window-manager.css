@@ -367,8 +367,24 @@ body.fm-window-resizing *{
     background: rgba(98, 169, 243, 0.85);
 }
 
+.fm-taskbar-pill::before{
+    content: '';
+    position: absolute;
+    left: -12px;
+    right: -12px;
+    top: -13px;
+    bottom: -6px;
+}
+
 @media (pointer: coarse){
     .fm-taskbar-pill{
         height: 7px;
+    }
+
+    .fm-taskbar-pill::before{
+        left: 0;
+        right: 0;
+        top: 0;
+        bottom: 0;
     }
 }

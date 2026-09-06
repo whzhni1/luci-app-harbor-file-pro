@@ -37,6 +37,9 @@ msgstr "无法删除根目录"
 msgid "Cannot load the %s UCI config"
 msgstr "无法加载 %s UCI 配置"
 
+msgid "Cannot read the archive contents"
+msgstr "无法读取压缩包内容"
+
 msgid "Cannot rename root"
 msgstr "无法重命名根目录"
 
@@ -635,6 +638,9 @@ msgstr "偏移量"
 msgid "Offset, e.g. 0x1A2B or 6699"
 msgstr "偏移量，如 0x1A2B 或 6699"
 
+msgid "Only the first %d entries are listed"
+msgstr "仅列出前 %d 个条目"
+
 msgid "Open"
 msgstr "打开"
 
@@ -743,14 +749,38 @@ msgstr "读取大小"
 msgid "Reading full file…"
 msgstr "正在读取完整文件…"
 
+msgid "Reading the archive contents"
+msgstr "正在读取压缩包内容"
+
+msgid "Reading the task status failed, retrying (attempt %d)"
+msgstr "读取任务状态失败，正在重试（第 %d 次）"
+
+msgid "Task result could not be confirmed"
+msgstr "无法确认任务结果"
+
 msgid "Recover"
 msgstr "恢复"
+
+msgid "Search as ASCII"
+msgstr "按 ASCII 搜"
+
+msgid "Invalid regular expression"
+msgstr "正则表达式无效"
+
+msgid "Save or undo the staged replace first"
+msgstr "请先保存或撤销当前的暂存替换"
 
 msgid "Redo"
 msgstr "重做"
 
 msgid "Refresh"
 msgstr "刷新"
+
+msgid "Only applies to text search"
+msgstr "按 ASCII 搜索时才生效"
+
+msgid "Regex search is always case sensitive"
+msgstr "正则搜索始终按大小写精确匹配"
 
 msgid "Regular expression"
 msgstr "正则表达式"
@@ -829,6 +859,9 @@ msgstr "秒"
 
 msgid "Select all"
 msgstr "全选"
+
+msgid "Select at least one entry"
+msgstr "请至少勾选一个条目"
 
 msgid "Select destination folder"
 msgstr "选择目标文件夹"
@@ -934,6 +967,9 @@ msgstr "终端连接失败"
 
 msgid "The archive cannot be written inside its own source"
 msgstr "归档文件不能写入其自身的来源目录内"
+
+msgid "The archive produced no files"
+msgstr "归档没有解出任何文件"
 
 msgid "The destination already contains these entries"
 msgstr "目标目录已包含同名条目"

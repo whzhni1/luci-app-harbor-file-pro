@@ -162,6 +162,7 @@
 				path: path,
 				q: needle,
 				encoding: opts.encoding || 'text',
+				regex: opts.regex ? 1 : 0,
 				start: opts.start || 0,
 				last: opts.last ? 1 : 0,
 				before: opts.before,
@@ -187,8 +188,10 @@
 				q: needle,
 				r: replacement,
 				encoding: opts.encoding || 'text',
-				rencoding: opts.encoding || 'text',
-				ignorecase: opts.ignoreCase ? 1 : 0
+				rencoding: opts.rencoding || opts.encoding || 'text',
+				regex: opts.regex ? 1 : 0,
+				ignorecase: opts.ignoreCase ? 1 : 0,
+				range: opts.range || null
 			};
 			if (opts.stageSrc) {
 				q.stage = 1;

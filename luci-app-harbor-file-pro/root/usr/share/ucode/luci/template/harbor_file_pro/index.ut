@@ -372,7 +372,13 @@ HarborFile.init({
         invalid_permissions: '{{ _('Invalid permissions') }}',
         permissions_updated: '{{ _('Permissions updated') }}',
         update_failed: '{{ _('Update failed') }}',
-        enter_absolute_path: '{{ _('Please enter an absolute path starting with /') }}'
+        enter_absolute_path: '{{ _('Please enter an absolute path starting with /') }}',
+        extract_loading: '{{ _('Reading the archive contents') }}',
+        extract_truncated: '{{ _('Only the first %d entries are listed') }}',
+        extract_none_selected: '{{ _('Select at least one entry') }}',
+        extract_list_failed: '{{ _('Cannot read the archive contents') }}',
+        task_status_retry: '{{ _('Reading the task status failed, retrying (attempt %d)') }}',
+        task_status_unknown: '{{ _('Task result could not be confirmed') }}'
     },
     resource: '{{ resource }}/harbor_file_pro/'
 });
@@ -1147,6 +1153,7 @@ window.HarborFile.tr = function (msgid) {
         <label class="fm-form-label" for="fm_archive_format">{{ _('Archive format') }}</label>
         <select id="fm_archive_format" class="fm-form-select">
             <option value="tar.gz">tar.gz</option>
+            <option value="zip">zip</option>
             <option value="tar">tar</option>
         </select>
         <label class="fm-form-label" for="fm_archive_name">{{ _('Archive name') }}</label>
@@ -1160,7 +1167,7 @@ window.HarborFile.tr = function (msgid) {
     </div>
 </section>
 
-<section id="fm_extract_dialog" class="fm-dialog" role="dialog" aria-modal="true" aria-labelledby="fm_extract_title">
+<section id="fm_extract_dialog" class="fm-dialog fm-pref-sized-dialog" role="dialog" aria-modal="true" aria-labelledby="fm_extract_title">
     <div class="fm-dialog-header">
         <div id="fm_extract_title" class="fm-dialog-title">{{ _('Extract') }}</div>
         <button class="fm-dialog-close" type="button" aria-label="{{ _('Close') }}">&times;</button>
@@ -1169,6 +1176,14 @@ window.HarborFile.tr = function (msgid) {
         <div id="fm_extract_source" class="fm-form-help">-</div>
         <label class="fm-form-label" for="fm_extract_target">{{ _('Target path') }}</label>
         <input id="fm_extract_target" class="fm-form-input" type="text" autocomplete="off">
+        <div class="fm-extract-head">
+            <label class="fm-extract-all" for="fm_extract_all">
+                <input id="fm_extract_all" type="checkbox" checked>
+                <span>{{ _('Select all') }}</span>
+            </label>
+            <span id="fm_extract_count" class="fm-extract-count">-</span>
+        </div>
+        <div id="fm_extract_list" class="fm-extract-list"></div>
     </div>
     <div class="fm-dialog-actions">
         <button id="fm_extract_cancel" class="fm-dialog-action" type="button">{{ _('Cancel') }}</button>
@@ -1415,6 +1430,9 @@ window.HarborFile.tr = function (msgid) {
     document.getElementById('fm_archive_start').addEventListener('click', HF.submit_archive_dialog);
     document.getElementById('fm_extract_cancel').addEventListener('click', HF.close_modal);
     document.getElementById('fm_extract_start').addEventListener('click', HF.submit_extract_dialog);
+    document.getElementById('fm_extract_all').addEventListener('change', HF.set_all_extract_entries);
+    document.getElementById('fm_extract_list').addEventListener('change', HF.on_extract_row_change);
+    document.getElementById('fm_extract_list').addEventListener('click', HF.on_extract_list_click);
     document.getElementById('fm_extract_target').addEventListener('keydown', function(event) {
         if (event.key === 'Enter') {
             event.preventDefault();
@@ -1690,28 +1708,28 @@ window.HarborFile.tr = function (msgid) {
         HF.close_anchor_menus(); HF.close_modal(); HF.open_path(item.path, true);
     });
     document.getElementById('fm_menu_bookmark_edit').addEventListener('click', function() {
-        HF.hide_context_menus();
+        HF.hide_context_menus(HF.fav_panel());
         var item = HF.state.bookmark_menu_item;
         if (!item) { return; }
         if (item.is_folder) { HF.open_name_dialog('bm_folder_rename', { folder: item.folder }); return; }
         HF.open_bookmark_editor(item);
     });
     document.getElementById('fm_menu_bookmark_up').addEventListener('click', function() {
-        HF.hide_context_menus();
+        HF.hide_context_menus(HF.fav_panel());
         var item = HF.state.bookmark_menu_item;
         if (!item) { return; }
         if (item.is_folder) { HF.move_bookmark_folder(item.folder, 'up'); return; }
         HF.move_bookmark(item, 'up');
     });
     document.getElementById('fm_menu_bookmark_down').addEventListener('click', function() {
-        HF.hide_context_menus();
+        HF.hide_context_menus(HF.fav_panel());
         var item = HF.state.bookmark_menu_item;
         if (!item) { return; }
         if (item.is_folder) { HF.move_bookmark_folder(item.folder, 'down'); return; }
         HF.move_bookmark(item, 'down');
     });
     document.getElementById('fm_menu_bookmark_delete').addEventListener('click', function() {
-        HF.hide_context_menus();
+        HF.hide_context_menus(HF.fav_panel());
         var item = HF.state.bookmark_menu_item;
         if (!item) { return; }
         if (item.is_folder) { HF.delete_bookmark_folder(item.folder); return; }
@@ -1734,8 +1752,11 @@ window.HarborFile.tr = function (msgid) {
             HF.set_warning_status(HF.state.uploading ? HF.labels.upload_busy : HF.labels.select_upload_target);
         }
     });
-    window.addEventListener('scroll', function() {
+    window.addEventListener('scroll', function(event) {
         HF.hide_item_hover_card();
+        if (HF.scroll_inside_overlay(event && event.target)) {
+            return;
+        }
         HF.hide_context_menus();
     }, true);
     document.addEventListener('keydown', function(event) {

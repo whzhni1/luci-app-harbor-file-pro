@@ -76,7 +76,8 @@
     HF.archive_format_suffix = function archive_format_suffix(format) {
         return {
             'tar.gz': '.tar.gz',
-            'tar': '.tar'
+            'tar': '.tar',
+            'zip': '.zip'
         }[format] || '.tar.gz';
     }
 
@@ -86,7 +87,7 @@
 
     HF.archive_base_name = function archive_base_name(name) {
         var value = String(name || 'archive');
-        return value.replace(/(\.tar\.gz|\.tgz|\.tar|\.zip|\.gz)$/i, '') || 'archive';
+        return value.replace(/(\.tar\.gz|\.tar\.bz2|\.tar\.xz|\.tgz|\.tar|\.zip|\.gz|\.7z|\.iso)$/i, '') || 'archive';
     }
 
     HF.archive_extract_format = function archive_extract_format(item) {
@@ -103,8 +104,20 @@
         if (/\.zip$/.test(name)) {
             return 'zip';
         }
+        if (/\.tar\.bz2$/.test(name)) {
+            return 'tar.bz2';
+        }
+        if (/\.tar\.xz$/.test(name)) {
+            return 'tar.xz';
+        }
         if (/\.gz$/.test(name)) {
             return 'gz';
+        }
+        if (/\.7z$/.test(name)) {
+            return '7z';
+        }
+        if (/\.iso$/.test(name)) {
+            return 'iso';
         }
         return '';
     }
@@ -159,7 +172,8 @@
         document.getElementById('fm_archive_task_title').textContent = tool_missing ?
             HF.labels.archive_command_missing :
             (task.done ?
-                (task.success ? (creating ? HF.labels.archive_created : HF.labels.archive_extracted) : HF.labels.archive_failed) :
+                (HF.task_unconfirmed(task) ? HF.labels.task_status_unknown :
+                    (task.success ? (creating ? HF.labels.archive_created : HF.labels.archive_extracted) : HF.labels.archive_failed)) :
                 (creating ? HF.labels.creating_archive : HF.labels.extracting_archive));
         document.getElementById('fm_archive_task_status').textContent = tool_missing ?
             HF.format_label(HF.labels.archive_tool_required, tool) :
@@ -169,7 +183,11 @@
         document.getElementById('fm_archive_task_format').textContent = task.format || '-';
         document.getElementById('fm_archive_task_exit').textContent =
             task.exit_code === undefined || task.exit_code === null ? '-' : String(task.exit_code);
-        document.getElementById('fm_archive_task_log').textContent = task.log || HF.labels.no_log_yet;
+        var command_line = task.command ? '$ ' + task.command : '';
+        var log_text = task.log || '';
+        if (command_line && log_text.indexOf(command_line) < 0)
+            log_text = log_text ? command_line + '\n' + log_text : command_line;
+        document.getElementById('fm_archive_task_log').textContent = log_text || HF.labels.no_log_yet;
         var install_button = document.getElementById('fm_archive_install_tool');
         if (install_button) {
             install_button.style.display = tool_missing ? '' : 'none';
@@ -179,6 +197,26 @@
         }
         document.getElementById('fm_archive_task_close').disabled = !task.done && !tool_missing;
         document.getElementById('fm_archive_task_done').disabled = !task.done && !tool_missing;
+    }
+
+    HF.task_unconfirmed = function task_unconfirmed(task) {
+        return !!(task && task.done && task.state === 'unknown');
+    }
+
+    HF.report_task_poll_error = function report_task_poll_error(state_key, view, res, xhr, retry) {
+        var task = HF.state[state_key] || {};
+        task.poll_errors = (task.poll_errors || 0) + 1;
+        task.message = HF.format_label(HF.labels.task_status_retry, task.poll_errors) + ': ' +
+            ((res && res.message) ? res.message : (xhr ? HF.upload_error_message(xhr, HF.labels.request_failed) : HF.labels.request_failed));
+        if (task.poll_errors >= 30) {
+            task.done = true;
+            task.state = 'unknown';
+        }
+        HF.state[state_key] = task;
+        view(task);
+        if (!task.done && retry) {
+            retry();
+        }
     }
 
     HF.stop_archive_poll = function stop_archive_poll() {
@@ -197,7 +235,9 @@
             dataType: 'json',
             success: function(res) {
                 if (!res || res.code !== 0) {
-                    HF.set_error_status((res && res.message) || HF.labels.request_failed);
+                    HF.report_task_poll_error('archive_task', HF.update_archive_task_view, res, null, function() {
+                        HF.poll_archive_task(task_id);
+                    });
                     return;
                 }
                 HF.update_archive_task_view(res.data || {});
@@ -214,7 +254,9 @@
                 }
             },
             error: function(xhr) {
-                HF.set_error_status(HF.upload_error_message(xhr, HF.labels.request_failed));
+                HF.report_task_poll_error('archive_task', HF.update_archive_task_view, null, xhr, function() {
+                    HF.poll_archive_task(task_id);
+                });
             }
         });
     }
@@ -341,20 +383,286 @@
         submit(false);
     }
 
+    HF.extract_default_target = function extract_default_target(item) {
+        var parent = HF.parent_directory(item.path);
+        if (!parent || parent === '') {
+            parent = '/';
+        }
+        var base = HF.archive_base_name(item.name || HF.archive_file_name(item.path));
+        return (parent === '/' ? '' : parent) + '/' + base;
+    }
+
+    HF.set_extract_rows = function set_extract_rows(entries) {
+        var rows = (entries || []).map(function(entry) {
+            return { name: String(entry.name || ''), dir: !!entry.dir, size: entry.size, checked: true, expanded: false };
+        }).filter(function(row) {
+            return row.name !== '';
+        });
+        rows.sort(function(a, b) {
+            var ka = (a.dir ? a.name + '/' : a.name).toLowerCase();
+            var kb = (b.dir ? b.name + '/' : b.name).toLowerCase();
+            if (ka !== kb) {
+                return ka < kb ? -1 : 1;
+            }
+            return a.dir === b.dir ? 0 : (a.dir ? -1 : 1);
+        });
+        HF.state.extract_rows = rows;
+        HF.state.extract_collapsed = {};
+        rows.forEach(function(row) {
+            if (row.dir) {
+                HF.state.extract_collapsed[row.name] = true;
+            }
+        });
+        HF.state.extract_selectable = !HF.state.extract_truncated;
+        HF.render_extract_list();
+    }
+
+    HF.extract_child_files = function extract_child_files(name) {
+        var prefix = name + '/';
+        return (HF.state.extract_rows || []).filter(function(row) {
+            return !row.dir && row.name.indexOf(prefix) === 0;
+        });
+    }
+
+    HF.extract_files = function extract_files() {
+        return (HF.state.extract_rows || []).filter(function(row) {
+            return !row.dir;
+        });
+    }
+
+    HF.extract_hidden = function extract_hidden(name) {
+        var parts = String(name || '').split('/');
+        var path = '';
+        for (var i = 0; i < parts.length - 1; i++) {
+            path = path === '' ? parts[i] : path + '/' + parts[i];
+            if (HF.state.extract_collapsed[path]) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    HF.toggle_extract_fold = function toggle_extract_fold(row) {
+        if (row.expanded) {
+            HF.state.extract_collapsed[row.name] = true;
+        } else {
+            delete HF.state.extract_collapsed[row.name];
+        }
+        row.expanded = !row.expanded;
+        HF.render_extract_list();
+    }
+
+    HF.render_extract_list = function render_extract_list() {
+        var box = document.getElementById('fm_extract_list');
+        if (!box) {
+            return;
+        }
+        var top = box.scrollTop;
+        (HF.state.extract_rows || []).forEach(function(row) { row.input = null; });
+        HF.clear_node(box);
+        (HF.state.extract_rows || []).filter(function(row) {
+            return !HF.extract_hidden(row.name);
+        }).forEach(function(row) {
+            var label = document.createElement('label');
+            label.className = 'fm-extract-row' + (row.dir ? ' is-dir' : '');
+            label.style.paddingLeft = ((row.name.match(/\//g) || []).length * 14) + 'px';
+            if (!HF.state.extract_selectable) {
+                label.className += ' is-plain';
+            }
+            if (row.dir) {
+                var fold = document.createElement('span');
+                fold.className = 'fm-extract-fold';
+                fold.setAttribute('data-fold', row.name);
+                fold.textContent = row.expanded ? '\u25be' : '\u25b8';
+                label.appendChild(fold);
+            }
+            var icon = document.createElement('img');
+            icon.className = 'fm-extract-icon';
+            icon.src = HF.icon_url(HF.icon_name_of({
+                name: leaf,
+                path: row.name,
+                type: row.dir ? 'directory' : 'file',
+                preview: 'none'
+            }));
+            icon.alt = '';
+            icon.draggable = false;
+            label.appendChild(icon);
+            var input = null;
+            if (HF.state.extract_selectable) {
+                input = document.createElement('input');
+                input.type = 'checkbox';
+                input.setAttribute('data-name', row.name);
+                if (row.dir) {
+                    input.setAttribute('data-dir', '1');
+                }
+            }
+            row.input = input;
+            var name = document.createElement('span');
+            name.className = 'fm-extract-name';
+            var leaf = row.name.indexOf('/') >= 0 ? row.name.slice(row.name.lastIndexOf('/') + 1) : row.name;
+            name.textContent = row.dir ? leaf + '/' : leaf;
+            name.setAttribute('title', row.name);
+            var size = document.createElement('span');
+            size.className = 'fm-extract-size';
+            size.textContent = (row.size === null || row.size === undefined) ? '-' : HF.format_size(row.size);
+            if (input) {
+                label.appendChild(input);
+            }
+            label.appendChild(name);
+            label.appendChild(size);
+            box.appendChild(label);
+        });
+        box.scrollTop = top;
+        HF.sync_extract_checks();
+    }
+
+    HF.on_extract_list_click = function on_extract_list_click(event) {
+        var fold = event && event.target;
+        if (!fold || !fold.getAttribute) {
+            return;
+        }
+        var name = fold.getAttribute('data-fold');
+        if (name === null || name === '') {
+            return;
+        }
+        if (event.preventDefault) {
+            event.preventDefault();
+        }
+        var row = (HF.state.extract_rows || []).filter(function(r) { return r.dir && r.name === name; })[0];
+        if (row) {
+            HF.toggle_extract_fold(row);
+        }
+    }
+
+    HF.sync_extract_checks = function sync_extract_checks() {
+        var rows = HF.state.extract_rows || [];
+        var files = HF.extract_files();
+        var picked = files.filter(function(row) { return row.checked; }).length;
+        rows.forEach(function(row) {
+            if (!row.input) {
+                return;
+            }
+            if (row.dir) {
+                var kids = HF.extract_child_files(row.name);
+                row.input.checked = kids.length ? kids.every(function(k) { return k.checked; }) : row.checked;
+            } else {
+                row.input.checked = row.checked;
+            }
+        });
+        var all = document.getElementById('fm_extract_all');
+        if (all) {
+            var usable = HF.state.extract_selectable && files.length > 0;
+            all.disabled = !usable;
+            all.checked = usable && picked === files.length;
+        }
+        HF.show_extract_count(picked, files.length);
+    }
+
+    HF.show_extract_count = function show_extract_count(picked, total) {
+        var count = document.getElementById('fm_extract_count');
+        if (!count) {
+            return;
+        }
+        count.textContent = HF.state.extract_hint ? HF.state.extract_hint : (picked + ' / ' + total);
+    }
+
+    HF.set_extract_hint = function set_extract_hint(text) {
+        HF.state.extract_hint = text || '';
+        HF.show_extract_count(HF.extract_files().filter(function(r) { return r.checked; }).length,
+            HF.extract_files().length);
+    }
+
+    HF.set_all_extract_entries = function set_all_extract_entries() {
+        var checked = document.getElementById('fm_extract_all').checked;
+        (HF.state.extract_rows || []).forEach(function(row) { row.checked = checked; });
+        HF.sync_extract_checks();
+    }
+
+    HF.on_extract_row_change = function on_extract_row_change(event) {
+        var input = event && event.target;
+        if (!input || input.type !== 'checkbox') {
+            return;
+        }
+        var name = input.getAttribute('data-name') || '';
+        var row = (HF.state.extract_rows || []).filter(function(r) { return r.name === name; })[0];
+        if (!row) {
+            return;
+        }
+        HF.toggle_extract_row(row, input.checked);
+    }
+
+    HF.toggle_extract_row = function toggle_extract_row(row, value) {
+        var rows = HF.state.extract_rows || [];
+        row.checked = value;
+        if (row.dir) {
+            var prefix = row.name + '/';
+            rows.forEach(function(other) {
+                if (other.name.indexOf(prefix) === 0) {
+                    other.checked = value;
+                }
+            });
+        } else {
+            var parts = row.name.split('/');
+            var path = '';
+            for (var i = 0; i < parts.length - 1; i++) {
+                path = path === '' ? parts[i] : path + '/' + parts[i];
+                (function(dir_path) {
+                    var kids = HF.extract_child_files(dir_path);
+                    rows.forEach(function(other) {
+                        if (other.dir && other.name === dir_path) {
+                            other.checked = kids.length ? kids.every(function(k) { return k.checked; }) : value;
+                        }
+                    });
+                })(path);
+            }
+        }
+        HF.sync_extract_checks();
+    }
+
+    HF.extract_payload_selection = function extract_payload_selection() {
+        var files = HF.extract_files();
+        var picked = files.filter(function(row) { return row.checked; });
+        if (!HF.state.extract_selectable) {
+            return { members: '', empty: false };
+        }
+        if (!picked.length) {
+            return { members: '', empty: files.length > 0 };
+        }
+        if (picked.length === files.length) {
+            return { members: '', empty: false };
+        }
+        return {
+            members: JSON.stringify(picked.map(function(row) { return row.name; })),
+            empty: false
+        };
+    }
+
     HF.start_archive_extract = function start_archive_extract(item) {
         if (!HF.is_archive_item(item)) {
             HF.set_warning_status(HF.labels.unsupported_archive);
             return;
         }
         HF.state.extract_item = item;
+        HF.state.extract_rows = [];
+        HF.state.extract_truncated = false;
+        HF.state.extract_selectable = true;
+        HF.state.extract_collapsed = {};
         document.getElementById('fm_extract_source').textContent = item.path;
-        var default_dir = HF.parent_directory(item.path);
-        if (!default_dir || default_dir === '') {
-            default_dir = '/';
-        }
-        document.getElementById('fm_extract_target').value = default_dir;
+        document.getElementById('fm_extract_target').value = HF.extract_default_target(item);
+        document.getElementById('fm_extract_all').checked = true;
+        HF.clear_node(document.getElementById('fm_extract_list'));
+        HF.set_extract_hint(HF.labels.extract_loading);
         HF.open_modal('fm_extract_dialog');
         document.getElementById('fm_extract_target').focus();
+        HF.request_json(HF.api.list, { path: item.path }, function(data) {
+            HF.state.extract_truncated = !!data.truncated;
+            HF.set_extract_hint(data.truncated ? HF.format_label(HF.labels.extract_truncated, (data.entries || []).length) : '');
+            HF.set_extract_rows(data.entries || []);
+        }, function(message) {
+            HF.state.extract_truncated = false;
+            HF.set_extract_rows([]);
+            HF.set_extract_hint(HF.labels.extract_list_failed + (message ? ': ' + message : ''));
+        });
     }
 
     HF.submit_extract_dialog = function submit_extract_dialog() {
@@ -367,7 +675,15 @@
             HF.set_warning_status(HF.labels.enter_absolute_path);
             return;
         }
+        var selection = HF.extract_payload_selection();
+        if (selection.empty) {
+            HF.set_warning_status(HF.labels.extract_none_selected);
+            return;
+        }
         var payload = { path: item.path, target_dir: target_dir };
+        if (selection.members) {
+            payload.members = selection.members;
+        }
         function submit(overwrite) {
             if (overwrite) {
                 payload.overwrite = '1';
@@ -1302,6 +1618,7 @@
         if (button) {
             button.classList.remove('menu-open');
         }
+        HF.keep_page_still(HF.anchor_menus_visible());
     }
 
     HF.anchor_menu_open = function anchor_menu_open(button) {
@@ -1327,8 +1644,38 @@
         button.classList.add('menu-open');
     }
 
-    HF.show_anchor_menu = function show_anchor_menu(menu, button) {
-        menu.style.display = 'block';
+    HF.fav_panel = function fav_panel() {
+        return document.getElementById('fm_fav_panel');
+    }
+
+    HF.scroll_inside_overlay = function scroll_inside_overlay(target) {
+        return !!(target && target.closest && target.closest('.fm-fav-panel, .fm-tool-dropdown, .fm-context-menu'));
+    }
+
+    HF.anchor_menus_visible = function anchor_menus_visible() {
+        var menus = document.querySelectorAll('.fm-tool-dropdown[data-anchor-menu], .fm-fav-panel[data-anchor-menu]');
+        for (var i = 0; i < menus.length; i++) {
+            if (menus[i].style.display === 'block') {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    HF.keep_page_still = function keep_page_still(locked) {
+        var state = HF.state.page_still || { on: false, overflow: '' };
+        if (!!locked === state.on) {
+            return;
+        }
+        if (locked) {
+            state.overflow = document.body.style.overflow || '';
+        }
+        document.body.style.overflow = locked ? 'hidden' : state.overflow;
+        state.on = !!locked;
+        HF.state.page_still = state;
+    }
+
+    HF.position_anchor_menu = function position_anchor_menu(menu, button) {
         var rect = button.getBoundingClientRect();
         var width = menu.offsetWidth || 170;
         var left = Math.max(8, Math.min(rect.right - width, window.innerWidth - width - 8));
@@ -1338,6 +1685,25 @@
         }
         menu.style.left = left + 'px';
         menu.style.top = top + 'px';
+    }
+
+    HF.reposition_anchor_menus = function reposition_anchor_menus() {
+        var menus = document.querySelectorAll('.fm-tool-dropdown[data-anchor-menu], .fm-fav-panel[data-anchor-menu]');
+        for (var i = 0; i < menus.length; i++) {
+            if (menus[i].style.display !== 'block') {
+                continue;
+            }
+            var button = document.getElementById(menus[i].getAttribute('data-anchor-menu'));
+            if (button) {
+                HF.position_anchor_menu(menus[i], button);
+            }
+        }
+    }
+
+    HF.show_anchor_menu = function show_anchor_menu(menu, button) {
+        menu.style.display = 'block';
+        HF.position_anchor_menu(menu, button);
+        HF.keep_page_still(true);
     }
 
     HF.bind_toolbar_actions = function bind_toolbar_actions() {
@@ -1357,6 +1723,18 @@
                 event.stopPropagation();
                 HF.toggle_bookmark();
             });
+        }
+        var follow = function() {
+            if (!HF.state.page_still || !HF.state.page_still.on) {
+                return;
+            }
+            HF.reposition_anchor_menus();
+        };
+        window.addEventListener('resize', follow, { passive: true });
+        document.addEventListener('scroll', follow, { passive: true, capture: true });
+        if (window.visualViewport) {
+            window.visualViewport.addEventListener('scroll', follow, { passive: true });
+            window.visualViewport.addEventListener('resize', follow, { passive: true });
         }
     }
 
@@ -1426,7 +1804,7 @@
     }
 
     HF.render_fav_panel = function render_fav_panel() {
-        var panel = document.getElementById('fm_fav_panel');
+        var panel = HF.fav_panel();
         if (!panel) {
             return;
         }
@@ -1530,7 +1908,7 @@
         HF.state.navigation.fav_expanded = data.fav_expanded || [];
         HF.render_sidebar();
         HF.update_star();
-        var panel = document.getElementById('fm_fav_panel');
+        var panel = HF.fav_panel();
         if (panel && panel.style.display === 'block') {
             HF.render_fav_panel();
         }
@@ -2414,11 +2792,23 @@
         HF.update_toolbar();
     }
 
+    HF.icon_name_of = function icon_name_of(item) {
+        if (item.type === 'directory') {
+            return 'folder';
+        }
+        if (item.preview === 'package') {
+            return String(item.ext || '').toLowerCase();
+        }
+        if (HF.is_archive_item(item)) {
+            return 'archive';
+        }
+        return item.preview && item.preview !== 'none' ? item.preview : 'file';
+    }
+
     HF.prepare_file_item = function prepare_file_item(item) {
         var is_directory = item.type === 'directory';
         var link = item.link_target || null;
         var is_package = !is_directory && item.preview === 'package';
-        var is_archive = !is_directory && HF.is_archive_item(item);
         var package_label = is_package ? HF.package_type_label(item.ext) : '';
         return {
             name: item.name,
@@ -2427,7 +2817,7 @@
             ext: item.ext || '',
             preview: item.preview || 'none',
             thumbnail_available: item.thumbnail_available === true,
-            icon_name: is_directory ? 'folder' : (is_package ? String(item.ext || '').toLowerCase() : (is_archive ? 'archive' : (item.preview && item.preview !== 'none' ? item.preview : 'file'))),
+            icon_name: HF.icon_name_of(item),
             is_system: is_directory && HF.is_system_folder(item.path),
             size: Number(item.size || 0),
             meta: is_directory ? HF.labels.folder : (is_package ? package_label : HF.format_size(item.size)),
@@ -2719,7 +3109,7 @@
             message: confirm_text
         }).then(function(ok) {
             if (ok) {
-                HF.run_batch_transfer('move', items, target_dir, HF.labels.move_complete, HF.refresh_after_write);
+                HF.run_batch_transfer('move', items, target_dir);
             }
         });
     }
@@ -2876,6 +3266,18 @@
         return HF.state.upload_speed;
     }
 
+    HF.reset_overwrite_actions = function reset_overwrite_actions() {
+        var actions = document.querySelector('#fm_overwrite_dialog .fm-dialog-actions');
+        if (!actions) {
+            return null;
+        }
+        var dynamic = actions.querySelectorAll('.fm-dynamic-paste-btn');
+        for (var i = 0; i < dynamic.length; i++) {
+            dynamic[i].remove();
+        }
+        return actions;
+    }
+
     HF.show_overwrite_dialog = function show_overwrite_dialog(batch, conflicts) {
         var list = document.getElementById('fm_conflict_list');
         HF.clear_node(list);
@@ -2886,8 +3288,7 @@
         });
         batch.conflicts = conflicts;
         HF.state.pending_upload = batch;
-        var actions = document.querySelector('#fm_overwrite_dialog .fm-dialog-actions');
-        actions.querySelectorAll('.fm-dynamic-paste-btn').forEach(function(el) { el.remove(); });
+        HF.reset_overwrite_actions();
         document.getElementById('fm_overwrite_confirm').style.display = '';
         HF.open_modal('fm_overwrite_dialog');
     }
@@ -3170,34 +3571,47 @@
         return res.message || fallback;
     }
 
-    HF.run_batch_transfer = function run_batch_transfer(action, items, target_path, success_message, on_ok) {
+    HF.report_batch_transfer = function report_batch_transfer(res, success_message) {
+        var data = (res && res.data) || {};
+        var results = data.results || [];
+        var skipped = 0;
+        var bad = [];
+        results.forEach(function (r) {
+            if (!r) {
+                return;
+            }
+            if (r.error === 'skipped') {
+                skipped++;
+            } else if (!r.ok) {
+                bad.push(r);
+            }
+        });
+        var done = results.length - bad.length - skipped;
+        if (bad.length) {
+            HF.set_error_status(bad.slice(0, 3).map(function (b) {
+                return (b.error || HF.labels.operation_failed) + '：' + (b.failed_item || b.path || '');
+            }).join('；') + (bad.length > 3 ? ' …' : ''));
+        }
+        else if (skipped && !done) {
+            HF.set_warning_status(HF.labels.skip + ': ' + skipped + ' ' + HF.labels.files);
+        }
+        else if (skipped) {
+            HF.set_status(success_message + ' (' + done + '/' + results.length + ', ' +
+                HF.labels.skip + ' ' + skipped + ')', 'success');
+        }
+        else {
+            HF.set_status(success_message, 'success');
+        }
+        return { done: done, failed: bad.length, skipped: skipped, total: results.length, all_ok: !bad.length };
+    }
+
+    HF.run_batch_transfer = function run_batch_transfer(action, items, target_path) {
         items = HF.normalize_item_list(items);
         if (!items.length || !target_path) {
             HF.set_warning_status(HF.labels.no_files);
             return;
         }
-        HF.Util.ajax({
-            url: action === 'copy' ? HF.api.batch_copy : HF.api.batch_move,
-            type: 'POST',
-            dataType: 'json',
-            data: {
-                sources: JSON.stringify(HF.item_list_paths(items)),
-                target_dir: target_path
-            },
-            success: function(res) {
-                if (!res || res.code !== 0) {
-                    HF.set_error_status((res && res.message) || HF.labels.operation_failed);
-                    return;
-                }
-                HF.set_status(success_message, 'success');
-                if (on_ok) {
-                    on_ok(res.data || {});
-                }
-            },
-            error: function(xhr) {
-                HF.set_error_status(HF.batch_error_message(xhr, HF.labels.operation_failed));
-            }
-        });
+        HF.confirm_paste_transfer(action, items, target_path);
     }
 
     HF.open_transfer_dialog = function open_transfer_dialog(action, items) {
@@ -3229,13 +3643,7 @@
             return;
         }
         HF.close_modal();
-        HF.run_batch_transfer(
-            transfer.action,
-            transfer.items,
-            target_path,
-            transfer.action === 'copy' ? HF.labels.copy_complete : HF.labels.move_complete,
-            HF.refresh_after_write
-        );
+        HF.run_batch_transfer(transfer.action, transfer.items, target_path);
     }
 
     HF.trigger_upload = function trigger_upload(target_dir, target_label) {
@@ -3302,21 +3710,8 @@
                     HF.set_error_status(res.message || HF.labels.operation_failed);
                     return;
                 }
-                var results = (res.data && res.data.results) || [];
-                var skipped = results.filter(function(r) { return r && r.error === 'skipped'; }).length;
-                var failed = Number(res.data && res.data.failed) || 0;
-                var done = results.length - failed - skipped;
-                if (done === 0 && skipped > 0 && failed === 0) {
-                    HF.set_warning_status(HF.labels.skip + ': ' + skipped + ' ' + HF.labels.files);
-                }
-                else if (skipped > 0) {
-                    HF.set_status(success_message + ' (' + done + '/' + results.length + ', ' +
-                        HF.labels.skip + ' ' + skipped + ')', 'success');
-                }
-                else {
-                    HF.set_status(success_message, 'success');
-                }
-                if (action === 'move' && done > 0) {
+                var summary = HF.report_batch_transfer(res, success_message);
+                if (action === 'move' && summary.done > 0 && summary.all_ok) {
                     HF.state.clipboard = null;
                 }
                 HF.refresh_after_write();
@@ -3340,6 +3735,10 @@
         var items = clipboard.items;
         var action = clipboard.mode === 'cut' ? 'move' : 'copy';
 
+        HF.confirm_paste_transfer(action, items, target_path);
+    }
+
+    HF.confirm_paste_transfer = function confirm_paste_transfer(action, items, target_path) {
         HF.Util.ajax({
             url: HF.api.batch_check,
             type: 'POST',
@@ -3382,16 +3781,14 @@
 
         var confirmBtn = document.getElementById('fm_overwrite_confirm');
         confirmBtn.style.display = 'none';
-        var actions = document.querySelector('#fm_overwrite_dialog .fm-dialog-actions');
-        var existingDynamic = actions.querySelectorAll('.fm-dynamic-paste-btn');
-        existingDynamic.forEach(function(el) { el.remove(); });
+        var actions = HF.reset_overwrite_actions();
 
         var replaceBtn = document.createElement('button');
         replaceBtn.className = 'fm-dialog-action primary fm-dynamic-paste-btn';
         replaceBtn.textContent = HF.labels.overwrite;
         replaceBtn.onclick = function() {
             HF.close_modal();
-            HF.executePaste(action, items, target_path, 'replace');
+            HF.executePaste(action, items, target_path, 'overwrite');
         };
         actions.appendChild(replaceBtn);
 
@@ -3477,7 +3874,8 @@
         var task = data || {};
         HF.state.install_task = task;
         document.getElementById('fm_package_install_title').textContent = task.done ?
-            (task.success ? HF.labels.install_success : HF.labels.install_failed) :
+            (HF.task_unconfirmed(task) ? HF.labels.task_status_unknown :
+                (task.success ? HF.labels.install_success : HF.labels.install_failed)) :
             HF.labels.installing_package;
         document.getElementById('fm_package_install_status').textContent = task.message || HF.labels.install_running;
         document.getElementById('fm_package_install_name').textContent =
@@ -3501,7 +3899,9 @@
             dataType: 'json',
             success: function(res) {
                 if (!res || res.code !== 0) {
-                    HF.set_error_status((res && res.message) || HF.labels.request_failed);
+                    HF.report_task_poll_error('install_task', HF.update_package_install_view, res, null, function() {
+                        HF.poll_package_install(task_id);
+                    });
                     return;
                 }
                 HF.update_package_install_view(res.data || {});
@@ -3515,7 +3915,9 @@
                 }
             },
             error: function(xhr) {
-                HF.set_error_status(HF.upload_error_message(xhr, HF.labels.request_failed));
+                HF.report_task_poll_error('install_task', HF.update_package_install_view, null, xhr, function() {
+                    HF.poll_package_install(task_id);
+                });
             }
         });
     }
@@ -3579,7 +3981,9 @@
             dataType: 'json',
             success: function(res) {
                 if (!res || res.code !== 0) {
-                    HF.set_error_status((res && res.message) || HF.labels.request_failed);
+                    HF.report_task_poll_error('thumbnail_task', HF.update_thumbnail_view, res, null, function() {
+                        HF.poll_thumbnail_generation(task_id);
+                    });
                     return;
                 }
                 HF.update_thumbnail_view(res.data || {});
@@ -3596,7 +4000,9 @@
                 }
             },
             error: function(xhr) {
-                HF.set_error_status(HF.upload_error_message(xhr, HF.labels.request_failed));
+                HF.report_task_poll_error('thumbnail_task', HF.update_thumbnail_view, null, xhr, function() {
+                    HF.poll_thumbnail_generation(task_id);
+                });
             }
         });
     }

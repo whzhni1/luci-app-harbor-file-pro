@@ -385,6 +385,7 @@
         model.query = '';
         model.match_total = 0;
         model.match_base = 0;
+        model.advance_to = null;
     }
 
     HF.wm_first_intersecting_match = function wm_first_intersecting_match(matches, start_index) {
@@ -415,7 +416,22 @@
         model.query = query || '';
         if (!model.matches.length) {
             model.current = -1;
+            model.advance_to = null;
             return -1;
+        }
+        if (model.advance_to != null) {
+            var want = model.advance_to;
+            model.advance_to = null;
+            for (var ai = 0; ai < model.matches.length; ai++) {
+                var hit = model.matches[ai];
+                var at = hit && hit.index != null ? hit.index : hit;
+                if (at >= want) {
+                    model.current = ai;
+                    return ai;
+                }
+            }
+            model.current = 0;
+            return 0;
         }
         if (!direction) {
             model.current = -1;
@@ -563,34 +579,53 @@
         regex_label.appendChild(regex_box);
         regex_label.appendChild(document.createTextNode(HF.tr('Regular expression')));
         replace_row.appendChild(regex_label);
+        var ascii_box = null;
+        var jump_box = null;
+        var regex_on = false;
+        var case_by_user = null;
+        if (options.hex) {
+            var ascii_label = HF.Util.createElement('label', 'fm-editor-search-option');
+            ascii_box = HF.Util.createElement('input', '');
+            ascii_box.type = 'checkbox';
+            ascii_label.appendChild(ascii_box);
+            ascii_label.appendChild(document.createTextNode(HF.tr('Search as ASCII')));
+            row.insertBefore(ascii_label, case_label);
+        }
+        function text_mode() {
+            return !options.hex || !!(ascii_box && (ascii_box.checked || regex_box.checked));
+        }
+        function parse_offset(v) {
+            var val = String(v || '').trim();
+            if (!val) {
+                return -1;
+            }
+            var n = (/^0x/i).test(val) ? parseInt(val, 16)
+                : (/^[0-9a-fA-F]+$/).test(val) ? parseInt(val, 16)
+                : parseInt(val, 10);
+            return n === n && n >= 0 ? n : -1;
+        }
         if (options.offsetJump) {
             var jump_label = HF.Util.createElement('label', 'fm-editor-search-option');
-            var jump_box = HF.Util.createElement('input', '');
+            jump_box = HF.Util.createElement('input', '');
             jump_box.type = 'checkbox';
             jump_label.appendChild(jump_box);
             jump_label.appendChild(document.createTextNode(HF.tr('Offset')));
             replace_row.appendChild(jump_label);
-            regex_box.addEventListener('change', function () {
-                if (regex_box.checked && jump_box.checked) jump_box.checked = false;
-            });
-            jump_box.addEventListener('change', function () {
-                if (jump_box.checked && regex_box.checked) regex_box.checked = false;
-                input.placeholder = jump_box.checked
-                    ? (HF.tr('Offset, e.g. 0x1A2B or 6699'))
-                    : (options.placeholder || HF.tr('Search'));
-            });
-            var jump_exec = function () {
+            var jump_exec = function (quiet) {
                 if (!jump_box.checked) return false;
                 var v = String(input.value || '').trim();
-                if (!v) return true;
-                var n = (/^0x/i).test(v) ? parseInt(v, 16)
-                    : (/^[0-9a-fA-F]+$/).test(v) ? parseInt(v, 16)
-                    : parseInt(v, 10);
-                if (n !== n) { HF.set_warning_status(HF.tr('Invalid offset')); return true; }
+                if (!v) {
+                    if (quiet) options.clear();
+                    return true;
+                }
+                var n = parse_offset(v);
+                if (n < 0) {
+                    if (quiet) options.clear(); else HF.set_warning_status(HF.tr('Invalid offset'));
+                    return true;
+                }
                 options.offsetJump(n);
                 return true;
             };
-            jump_exec_guard = jump_exec;
             input.addEventListener('keydown', function (event) {
                 if (event.key === 'Enter' && jump_exec()) {
                     event.preventDefault();
@@ -604,11 +639,61 @@
                 });
             })();
             var prev_handler = function (e) { if (jump_exec()) { e.preventDefault(); e.stopPropagation(); } };
-            // wrap the arrows: offset mode intercepts
             var orig_prev_click = previous.onclick;
             previous.addEventListener('click', prev_handler, true);
             next.addEventListener('click', prev_handler, true);
         }
+        function sync_search_boxes(who) {
+            if (jump_box && jump_box.checked && (ascii_box.checked || regex_box.checked)) {
+                if (who === jump_box) {
+                    ascii_box.checked = false;
+                    regex_box.checked = false;
+                } else {
+                    jump_box.checked = false;
+                }
+            }
+            if (ascii_box && ascii_box.checked && regex_box.checked) {
+                if (who === regex_box) {
+                    ascii_box.checked = false;
+                } else {
+                    regex_box.checked = false;
+                }
+            }
+            var off_locked = !!(jump_box && jump_box.checked);
+            if (jump_box) {
+                replacement.disabled = off_locked;
+                replace_all_button.disabled = off_locked;
+                replace_button.disabled = off_locked;
+            }
+            if (regex_box.checked !== regex_on) {
+                if (regex_box.checked) {
+                    case_by_user = case_box.checked;
+                } else if (case_by_user !== null) {
+                    case_box.checked = case_by_user;
+                    case_by_user = null;
+                }
+                regex_on = regex_box.checked;
+            }
+            var as_text = text_mode();
+            case_box.disabled = !as_text || regex_box.checked;
+            if (regex_box.checked) case_box.checked = true;
+            else if (!as_text) case_box.checked = false;
+            case_label.title = !as_text ? HF.tr('Only applies to text search') : (regex_box.checked ? HF.tr('Regex search is always case sensitive') : '');
+            if (options.hex) {
+                ascii_box.disabled = regex_box.checked;
+                regex_box.disabled = !!ascii_box.checked;
+                replace_button.disabled = off_locked;
+                replace_button.title = '';
+                replacement.placeholder = as_text ? HF.tr('Replace with') : (options.replacePlaceholder || HF.tr('Replace hex value'));
+            }
+            input.placeholder = (jump_box && jump_box.checked)
+                ? HF.tr('Offset, e.g. 0x1A2B or 6699')
+                : (as_text ? HF.tr('Search text') : (options.placeholder || HF.tr('Search')));
+        }
+        [ascii_box, case_box, regex_box, jump_box].forEach(function (box) {
+            if (box) box.addEventListener('change', function () { sync_search_boxes(box); });
+        });
+        sync_search_boxes();
         shell.appendChild(replace_row);
         content.insertBefore(shell, content.firstChild);
 
@@ -620,14 +705,18 @@
         if (header) header.insertBefore(search_button, controls || null);
 
         var timer = null;
-        var jump_exec_guard = null;
         function execute(direction) {
             if (timer) clearTimeout(timer);
             timer = null;
-            options.search(input.value, !!(regex_box && regex_box.checked), case_box.checked, direction || 0);
+            if (jump_box && jump_box.checked) {
+                if (!direction) jump_exec(true);
+                return;
+            }
+            options.search(input.value, !!(regex_box && regex_box.checked), case_box.checked,
+                direction || 0, text_mode());
         }
         function replace_step(all) {
-            if (!options.replaceStep) {
+            if (!options.replaceStep || (jump_box && jump_box.checked)) {
                 return;
             }
             options.replaceStep(replacement.value, all, 1);
@@ -637,9 +726,13 @@
             timer = setTimeout(function() { execute(0); }, 160);
         }
         input.addEventListener('input', schedule);
-        case_box.addEventListener('change', schedule);
-        if (regex_box) regex_box.addEventListener('change', schedule);
-        input.addEventListener('keydown', function(event) { if (event.key === 'Enter') { event.preventDefault(); if (!(options.offsetJump && jump_exec_guard && jump_exec_guard())) execute(1); } });
+        [case_box, regex_box, ascii_box].forEach(function (box) {
+            if (box) box.addEventListener('change', schedule);
+        });
+        if (jump_box) jump_box.addEventListener('change', function () {
+            if (jump_box.checked) execute(0); else schedule();
+        });
+        input.addEventListener('keydown', function(event) { if (event.key === 'Enter') { event.preventDefault(); if (options.offsetJump && jump_box && jump_box.checked) return; if (options.hex && options.offsetJump && !text_mode() && (/^0x[0-9a-fA-F]+$/i).test(String(input.value || '').trim())) { var on = parse_offset(input.value); if (on >= 0) { options.offsetJump(on); return; } } execute(1); } });
         previous.addEventListener('click', function() { execute(-1); });
         next.addEventListener('click', function() { execute(1); });
         replace_button.addEventListener('click', function() { replace_step(false); });
@@ -987,11 +1080,17 @@
             render_dom();
         }
 
-        function find(query, case_sensitive) {
+        function find(query, case_sensitive, regex) {
             if (!query) {
                 return [];
             }
-            var regexp = new RegExp(HF.wm_escape_regex(query), 'g' + (case_sensitive ? '' : 'i'));
+            var regexp;
+            try {
+                regexp = new RegExp(regex ? query : HF.wm_escape_regex(query), 'g' + (case_sensitive ? '' : 'i'));
+            } catch (error) {
+                HF.set_warning_status(HF.tr('Invalid regular expression'));
+                return [];
+            }
             var matches = [];
             var match;
             while ((match = regexp.exec(session.text))) {
@@ -1057,7 +1156,8 @@
 
         function search_text(query, regex, case_sensitive, direction) {
             session.caseSensitive = !!case_sensitive;
-            var current = HF.wm_commit_search(session, query, find(query, session.caseSensitive), direction);
+            session.useRegex = !!regex;
+            var current = HF.wm_commit_search(session, query, find(query, session.caseSensitive, session.useRegex), direction);
             if (current >= 0) {
                 navigate(current);
             } else {
@@ -1253,7 +1353,7 @@
                 });
                 session.text = text;
                 session.dirty = true;
-                HF.wm_commit_search(session, session.query, find(session.query, session.caseSensitive), 0);
+                HF.wm_commit_search(session, session.query, find(session.query, session.caseSensitive, session.useRegex), 0);
                 if (session.matches.length) {
                     session.current = all ? 0 : (direction < 0 ? (current - 1 + session.matches.length) % session.matches.length : current % session.matches.length);
                     navigate(session.current);
@@ -1605,7 +1705,6 @@
         function capture_change() {
             history.capture(edit_state());
         }
-        // every local edit re-syncs the combined history availability
         var raw_refresh_history = null;
         function update_cursor_hex() {
             if (session.selected < 0) {
@@ -1913,10 +2012,14 @@
             HF.wm_refresh_search_counter(search, session);
             HF.wm_animate_scroll(scroll, scroll.scrollLeft, Math.max(0, 28 + Math.floor(match.index / 16) * session.rowHeight - scroll.clientHeight * 0.4), 210).then(paint);
         }
-        function search_hex(query, regex, case_sensitive, direction) {
+        function search_hex(query, regex, case_sensitive, direction, as_text) {
+            if (as_text === undefined) {
+                as_text = !!session.asText;
+            }
+            session.asText = !!as_text;
             session.caseSensitive = !!case_sensitive;
             session.useRegex = !!regex;
-            if (regex) {
+            if (as_text) {
                 var text_query = String(query || '');
                 if (!text_query) { clear(); return; }
                 var same_query = session.query === query && session.matches.length;
@@ -1928,8 +2031,10 @@
                     }
                 }
                 var match_len = HF.wm_encode_utf8(text_query).length;
-                session.source.search(text_query, { encoding: 'text', ignoreCase: !case_sensitive, limit: 1000 }).then(function(r) {
-                    var matches = (r.matches || []).map(function(off) { return { index: off, length: match_len }; });
+                session.source.search(text_query, { encoding: 'text', regex: regex ? 1 : 0, ignoreCase: !case_sensitive, limit: 1000 }).then(function(r) {
+                    var matches = (r.matches || []).map(function(off, i) {
+                        return { index: off, length: (r.lengths && r.lengths[i]) || match_len };
+                    });
                     session.match_total = r.total || matches.length;
                     session.match_base = 0;
                     search_next_cursor = r.next || null;
@@ -1941,12 +2046,9 @@
                 return;
             }
             var compact = String(query || '').replace(/\s+/g, '').toUpperCase();
-            if (!compact || compact.length % 2) { clear(); return; }
+            if (!compact || compact.length % 2 || !(/^[0-9A-F]+$/).test(compact)) { clear(); return; }
             var same_query = session.query === query && session.matches.length;
 
-            // Interior stepping is purely local -- no server round trip per
-            // arrow click. Only batch boundaries fall through to the window
-            // logic below.
             if (same_query && direction && session.current >= 0) {
                 var local_target = session.current + (direction > 0 ? 1 : -1);
                 if (local_target >= 0 && local_target < session.matches.length) {
@@ -1960,7 +2062,6 @@
                 var win = (r.matches || []).map(function(off) { return { index: off, length: nlen }; });
                 session.match_total = r.total || session.match_total;
                 if (wrap_to_front && !win.length) {
-                    // already at the very beginning: wrap to the END window
                     session.source.search(compact, { encoding: 'hex', ignoreCase: !case_sensitive, regex: regex ? 1 : 0, limit: 1000, last: 1 }).then(adopt_window_end);
                     return;
                 }
@@ -1981,7 +2082,6 @@
                 navigate(session.current);
             }
 
-            // forward past the loaded tail
             if (direction > 0 && same_query && session.current === session.matches.length - 1) {
                 var start_at = search_next_cursor || (session.matches.length ? session.matches[session.matches.length - 1].index + 1 : 0);
                 session.source.search(compact, {
@@ -1991,7 +2091,6 @@
                     var fresh = (r.matches || []).map(function(off) { return { index: off, length: nlen }; });
                     if (fresh.length) {
                         if (r.below !== undefined && r.below !== null && r.first !== undefined && r.first !== null) {
-                            // window response: replace
                             session.matches = fresh;
                             session.match_base = r.below || 0;
                         } else {
@@ -2002,7 +2101,6 @@
                         session.current = session.matches.length - fresh.length;
                         navigate(session.current);
                     } else if (session.match_base > 0) {
-                        // window tail reached: wrap to the first batch
                         session.source.search(compact, { encoding: 'hex', ignoreCase: !case_sensitive, regex: regex ? 1 : 0, limit: 1000, start: 0 }).then(function(r2) {
                             var nlen2 = Math.max(1, compact.length / 2);
                             session.matches = (r2.matches || []).map(function(off) { return { index: off, length: nlen2 }; });
@@ -2020,8 +2118,6 @@
                 return;
             }
 
-            // backward from the loaded head: jump to the END window, or the
-            // previous window when already inside one
             if (direction < 0 && same_query && session.current <= 0) {
                 if (session.match_base > 0) {
                     session.source.search(compact, {
@@ -2074,7 +2170,6 @@
                 var entry = session.server_undo.pop();
                 session.server_redo.push(entry);
                 if (entry.first || !session.server_undo.length) {
-                    // back before the first staged replace: discard the stage
                     HarborIO.stageDiscard(item.path).then(function () {
                         session.stage = null;
                         session.source.setPath(item.path);
@@ -2086,14 +2181,11 @@
                     });
                     return;
                 }
-                HF.run_replace_all(item, entry.r, entry.q, { encoding: 'hex', stageSrc: session.stage || item.path }, function () {
-                    session.source.invalidate();
-                    refresh_dirty();
-                    refresh();
-                    refresh_history();
-                    paint();
-                    search_hex(session.query, false, session.caseSensitive, 0);
-                }, tip);
+                if (entry.range) {
+                    HF.run_replace_all(item, '', entry.orig, { encoding: 'hex', range: entry.range, stageSrc: session.stage || item.path }, after_staged_write, tip);
+                    return;
+                }
+                HF.run_replace_all(item, entry.r, entry.q, { encoding: entry.encoding || 'hex', regex: entry.regex ? 1 : 0, stageSrc: session.stage || item.path }, after_staged_write, tip);
                 return;
             }
             var prev = history.undo(edit_state());
@@ -2105,17 +2197,11 @@
             if (session.server_redo && session.server_redo.length) {
                 var entry = session.server_redo.pop();
                 session.server_undo.push(entry);
-                HF.run_replace_all(item, entry.q, entry.r, { encoding: 'hex', stageSrc: session.stage || item.path }, function (data) {
-                    if (!session.stage && data && data.staged) {
-                        session.stage = data.staged;
-                        session.source.setPath(session.stage);
-                    }
-                    refresh_dirty();
-                    refresh();
-                    refresh_history();
-                    paint();
-                    search_hex(session.query, false, session.caseSensitive, 0);
-                }, tip);
+                if (entry.range) {
+                    HF.run_replace_all(item, '', entry.r, { encoding: 'text', range: entry.range, stageSrc: session.stage || item.path }, after_staged_write, tip);
+                    return;
+                }
+                HF.run_replace_all(item, entry.q, entry.r, { encoding: entry.encoding || 'hex', regex: entry.regex ? 1 : 0, stageSrc: session.stage || item.path }, after_staged_write, tip);
                 return;
             }
             var next = history.redo(edit_state());
@@ -2142,23 +2228,65 @@
             }
         });
 
+        function after_staged_write(data) {
+            if (!session.stage) {
+                session.stage = (data && data.staged) || stage_of();
+                session.source.setPath(session.stage);
+            } else {
+                session.source.invalidate();
+            }
+            if (data && data.size) {
+                session.source.total = data.size;
+                item.size = data.size;
+            }
+            refresh_dirty();
+            refresh();
+            refresh_history();
+            paint();
+            search_hex(session.query, !!session.useRegex, session.caseSensitive, 0);
+        }
+        function replace_one_range(match, value) {
+            if (!match) {
+                return;
+            }
+            session.source.ensure(match.index, match.length).then(function () {
+                var bytes = session.source.get(match.index, match.length);
+                var orig = '';
+                for (var i = 0; i < bytes.length; i++) {
+                    orig += ('0' + bytes[i].toString(16).toUpperCase()).slice(-2);
+                }
+                var range = match.index + ':' + match.length;
+                if (session.source.dirtyCount() > 0 && !session.stage) {
+                    session.source.save(function () {});
+                }
+                session.server_undo.push({ range: range, orig: orig, r: value, first: !session.stage, encoding: 'text' });
+                session.advance_to = match.index + HF.wm_encode_utf8(value).length;
+                HF.run_replace_all(item, '', value, { encoding: 'text', range: range, stageSrc: session.stage || item.path }, after_staged_write, tip);
+            }).catch(function (error) { tip_text(error || HF.labels.request_failed); });
+        }
         session.server_undo = [];
         session.server_redo = [];
         var search = HF.wm_create_search(record, content, { placeholder: HF.tr('Enter hex bytes, e.g. DE AD BE EF'), replacePlaceholder: HF.tr('Replace hex value'), hex: true, clear: clear, search: search_hex, offsetJump: function (n) { jump_to(n); }, replaceStep: function(value, all, direction) {
+            if (session.asText) {
+                if (!value || !session.matches.length) return;
+                if (!all) {
+                    replace_one_range(session.matches[session.current >= 0 ? session.current : (direction < 0 ? session.matches.length - 1 : 0)], value);
+                    return;
+                }
+                if (session.stage) return tip_text(HF.tr('Save or undo the staged replace first'));
+                session.server_undo.push({ q: session.query, r: value, first: true, regex: session.useRegex ? 1 : 0, encoding: 'text' });
+                HF.run_replace_all(item, session.query, value, { encoding: 'text', regex: session.useRegex ? 1 : 0, ignoreCase: !session.caseSensitive, stageSrc: item.path }, after_staged_write, tip);
+                return;
+            }
             var replacement = HF.wm_parse_hex_bytes(value); if (!replacement || !session.matches.length) return;
             var current = session.current >= 0 ? session.current : (direction < 0 ? session.matches.length - 1 : 0);
             var list = all ? session.matches.slice() : [session.matches[current]];
             if (!list.every(function(match) { return match.length === replacement.length; })) return tip_text(HF.tr('Hex replacement must match the match length'));
 
-            // Bulk equal-length replace-all writes a STAGE copy: the editor
-            // shows the replaced result, the real file is untouched until the
-            // user clicks Save (atomic commit). Undo discards the stage.
             if (all) {
                 var needle_hex = session.query.replace(/\s+/g, '').toUpperCase();
                 var repl_hex = Array.prototype.map.call(replacement, function (b) { return ('0' + b.toString(16)).slice(-2).toUpperCase(); }).join('');
                 if (session.source.dirtyCount() > 0 && !session.stage) {
-                    // unsaved single edits present: flush them first so the
-                    // stage is built from what the user currently sees
                     session.source.save(function () {});
                 }
                 session.server_undo.push({ q: needle_hex, r: repl_hex, first: !session.stage });
@@ -2182,6 +2310,7 @@
             refresh_dirty(); refresh();
             history_buttons.refresh(history.canUndo(), history.canRedo());
             recovery_save();
+            session.advance_to = list[list.length - 1].index + replacement.length;
             search_hex(session.query, false, session.caseSensitive, 0);
         } });
         scroll.addEventListener('scroll', schedulePaint, { passive: true });
@@ -2265,7 +2394,7 @@
             }).catch(function () {});
         }, 250);
 
-        HarborIO.replaceAll(item.path, q, r, { encoding: opts.encoding, ignoreCase: opts.ignoreCase, stageSrc: opts.stageSrc }).then(function (data) {
+        HarborIO.replaceAll(item.path, q, r, { encoding: opts.encoding, regex: opts.regex, ignoreCase: opts.ignoreCase, stageSrc: opts.stageSrc, range: opts.range }).then(function (data) {
             clearInterval(poll);
             show_tip(HF.labels.replacing + ' 100%');
             setTimeout(function () { show_tip(''); }, 400);
@@ -2391,8 +2520,6 @@
             refresh_status();
         });
 
-        // Ctrl+A in a windowed editor means the WHOLE file: a subsequent
-        // paste/delete replaces the entire content via splice(0, total).
         var select_all = false;
         area.addEventListener('keydown', function (event) {
             var mod = event.ctrlKey || event.metaKey;
@@ -2481,7 +2608,9 @@
             hex: false,
             clear: function () {},
             search: function (q, regex, case_sensitive, direction) {
-                HarborIO.search(item.path, q, { ignoreCase: !case_sensitive }).then(function (r) {
+                session.useRegex = !!regex;
+                session.caseSensitive = !!case_sensitive;
+                HarborIO.search(item.path, q, { regex: regex ? 1 : 0, ignoreCase: !case_sensitive }).then(function (r) {
                     var total = r.matches ? r.matches.length : 0;
                     if (!total) {
                         HF.set_warning_status(HF.labels.not_found);
@@ -2503,7 +2632,7 @@
                 if (!q) {
                     return;
                 }
-                HF.run_replace_all(item, q, value, { ignoreCase: false }, function (data) {
+                HF.run_replace_all(item, q, value, { encoding: 'text', regex: session.useRegex ? 1 : 0, ignoreCase: !session.caseSensitive }, function (data) {
                     HF.set_status((data.replaced || 0) + ' ' + HF.labels.replaced_count, 'success');
                     session.total = Number(data.size || session.total);
                     load(session.ws);

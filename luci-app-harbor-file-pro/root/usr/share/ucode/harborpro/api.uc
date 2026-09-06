@@ -16,7 +16,8 @@ const open = _fs.open,
       popen = _fs.popen,
       basename = _fs.basename,
       dirname = _fs.dirname,
-      readlink = _fs.readlink;
+      readlink = _fs.readlink,
+      symlink = _fs.symlink;
 
 const cursor = require('uci').cursor;
 
@@ -67,7 +68,7 @@ const AUDIO_MIME_MAP = {
 };
 
 const TOOL_PACKAGE_MAP = {
-	unzip:    'unzip',
+	bsdtar:   'bsdtar',
 	tar:      'tar',
 	gzip:     'gzip',
 	gunzip:   'gzip',
@@ -884,6 +885,20 @@ function write_task_state(file, st) {
 	return write_json_file(file, st);
 }
 
+function task_exit_code(rcfile) {
+	if (!rcfile)
+		return 0;
+
+	let rc = trim(readfile(rcfile) ?? '');
+	return match(rc, /^[0-9]+$/) ? +rc : -1;
+}
+
+function task_finished(rcfile) {
+	if (!rcfile)
+		return false;
+	return match(trim(readfile(rcfile) ?? ''), /^[0-9]+$/) != null;
+}
+
 function truncate_log(text, limit) {
 	limit ??= 16384;
 	if (length(text) <= limit)
@@ -1278,8 +1293,24 @@ function install_command(packages) {
 	return null;
 }
 
+function settle_task(state_file, st, rcfile, success) {
+	st.exit_code = task_exit_code(rcfile);
+	st.success = success != null ? !!success : (st.exit_code == 0);
+	st.state = st.success ? 'success' : 'failed';
+	st.done = true;
+	st.finished = now();
+	write_task_state(state_file, st);
+	return st;
+}
+
 function task_busy(file) {
 	return task_running(file);
+}
+
+function spawn_package_task(cmd) {
+	unlink(PACKAGE_RC);
+	unlink(PACKAGE_LOG);
+	return spawn_background(cmd, PACKAGE_LOG, PACKAGE_RC);
 }
 
 function start_install(packages, label) {
@@ -1293,7 +1324,7 @@ function start_install(packages, label) {
 		return fail(http, 1, tr('No supported package manager found'));
 
 	let task_id = make_task_id('tool');
-	let pid = spawn_background(cmd, PACKAGE_LOG, PACKAGE_RC);
+	let pid = spawn_package_task(cmd);
 
 	let task = {
 		task_id, label,
@@ -1313,26 +1344,29 @@ function start_install(packages, label) {
 function install_status(file, logfile, rcfile) {
 	let st = read_task_state(file);
 
-	if (!st)
-		return ok(http, { state: 'idle', done: true, success: false });
+	if (!st) {
+		if (!task_finished(rcfile))
+			return ok(http, { state: 'idle', done: true, success: false });
+		let rc = task_exit_code(rcfile);
+		return ok(http, {
+			state: rc == 0 ? 'success' : 'failed', done: true, success: rc == 0, exit_code: rc,
+			message: rc == 0 ? tr('Installation finished') : sprintf(tr('Installation failed (exit %d)'), rc),
+			log: truncate_log(readfile(logfile) ?? '', 16384)
+		});
+	}
 
 	let want = http.formvalue('task_id');
 	if (want && st.task_id && want != st.task_id)
 		return ok(http, { task_id: want, state: 'gone', done: true, success: false });
 
-	if (!st.done && st.pid && !process_alive(st.pid)) {
-		let rc = rcfile ? trim(readfile(rcfile) ?? '') : '';
-		st.exit_code = length(rc) ? +rc : 0;
-		st.success = (st.exit_code == 0);
-		st.state = st.success ? 'success' : 'failed';
-		st.done = true;
-		st.finished = now();
-		write_task_state(file, st);
-	}
+	if (!st.done && (task_finished(rcfile) || (st.pid && !process_alive(st.pid))))
+		settle_task(file, st, rcfile, null);
 
 	st.log = truncate_log(readfile(logfile) ?? '', 16384);
 
-	if (!st.message)
+	if (st.done && !st.success && st.exit_code < 0)
+		st.message = tr('Install task ended unexpectedly');
+	else if (!st.message)
 		st.message = st.done
 			? (st.success ? tr('Installation finished') : sprintf(tr('Installation failed (exit %d)'), st.exit_code ?? -1))
 			: 'installing...';
@@ -1474,7 +1508,7 @@ function api_package_install_start() {
 		join(' ', spec.args), shellquote(path));
 
 	let task_id = make_task_id('pkg');
-	let pid = spawn_background(cmd, PACKAGE_LOG, PACKAGE_RC);
+	let pid = spawn_package_task(cmd);
 
 	let task = {
 		task_id, path,
@@ -1613,26 +1647,33 @@ function api_thumbnail_generate_status() {
 	st.log           = truncate_log(log, 8192);
 
 	if (!st.done && st.pid && !process_alive(st.pid)) {
-		let rc = trim(readfile(THUMBNAIL_RC) ?? '');
-		st.exit_code = length(rc) ? +rc : 0;
-		st.success = (failc == 0);
-		st.state = st.success ? 'success' : 'failed';
-		st.done = true;
 		st.current_file = '';
-		st.finished = now();
-		write_task_state(THUMBNAIL_STATE_FILE, st);
+		settle_task(THUMBNAIL_STATE_FILE, st, THUMBNAIL_RC, failc == 0);
 	}
 
 	if (st.done && !st.success && !st.message)
-		st.message = sprintf('%d of %d thumbnails failed', failc, st.total ?? 0);
+		st.message = st.exit_code < 0
+			? tr('Thumbnail generation ended unexpectedly')
+			: sprintf('%d of %d thumbnails failed', failc, st.total ?? 0);
 
 	ok(http, st);
 }
 
+const ARCHIVE_SEL_FILE = '/tmp/harbor_file_pro_archive_sel.txt';
+const ARCHIVE_LIST_LIMIT = 4000;
 const ARCHIVE_LOG = '/tmp/harbor_file_pro_archive.log';
 const ARCHIVE_RC  = '/tmp/harbor_file_pro_archive.rc';
 
+function note_copy_failure(failed, path) {
+	if (failed)
+		failed.path = path;
+	return false;
+}
+
 function copy_file(src, dst) {
+	let src_st = lstat_safe(src);
+	if (src_st && src_st.type == 'directory')
+		return false;
 	let inf = open(src, 'r');
 	if (!inf)
 		return false;
@@ -1669,21 +1710,28 @@ function copy_file(src, dst) {
 	return okay;
 }
 
-function copy_recursive(src, dst) {
+function copy_recursive(src, dst, failed) {
 	let st = lstat_safe(src);
 	if (!st)
-		return false;
+		return note_copy_failure(failed, src);
+
+	if (st.type == 'link') {
+		let link = readlink(src);
+		if (link != null && symlink(link, dst))
+			return true;
+		return copy_file(src, dst) ? true : note_copy_failure(failed, src);
+	}
 
 	if (st.type == 'directory') {
 		if (!mkdir_p(dst))
-			return false;
+			return note_copy_failure(failed, src);
 		for (let name in (lsdir(src) ?? []))
-			if (!copy_recursive(join_path(src, name), join_path(dst, name)))
+			if (!copy_recursive(join_path(src, name), join_path(dst, name), failed))
 				return false;
 		return true;
 	}
 
-	return copy_file(src, dst);
+	return copy_file(src, dst) ? true : note_copy_failure(failed, src);
 }
 
 function is_descendant(parent, child) {
@@ -1702,6 +1750,9 @@ function transfer_one(src, dest_dir, mode, on_conflict, forced_name) {
 		? forced_name : path_name(src);
 	let target = join_path(dest_dir, name);
 
+	if (target == src)
+		return { ok: false, error: tr('Cannot transfer a directory into itself') };
+
 	if (lstat_safe(target)) {
 		if (on_conflict == 'skip')
 			return { ok: true, error: 'skipped' };
@@ -1719,16 +1770,18 @@ function transfer_one(src, dest_dir, mode, on_conflict, forced_name) {
 	if (mode == 'move') {
 		if (rename(src, target))
 			return { ok: true, error: null };
-		if (!copy_recursive(src, target))
-			return { ok: false, error: tr('Move failed') };
+		let move_fail = {};
+		if (!copy_recursive(src, target, move_fail))
+			return { ok: false, error: tr('Move failed'), failed_item: move_fail.path ?? src };
 		if (!remove_recursive(src))
-			return { ok: false, error: tr('Move succeeded but source could not be removed') };
+			return { ok: false, error: tr('Move succeeded but source could not be removed'), failed_item: src };
 		return { ok: true, error: null };
 	}
 
-	return copy_recursive(src, target)
+	let copy_fail = {};
+	return copy_recursive(src, target, copy_fail)
 		? { ok: true, error: null }
-		: { ok: false, error: tr('Copy failed') };
+		: { ok: false, error: tr('Copy failed'), failed_item: copy_fail.path ?? src };
 }
 
 function parse_path_array(http_obj, field) {
@@ -2258,11 +2311,291 @@ function api_navigation() {
 	});
 }
 
+function archive_kind(src, ext) {
+	let lower = lc(src);
+
+	if (ext == 'zip')
+		return 'zip';
+	if (substr(lower, -7) == '.tar.gz' || ext == 'tgz')
+		return 'targz';
+	if (substr(lower, -8) == '.tar.bz2' || ext == 'tbz')
+		return 'tarbz2';
+	if (substr(lower, -7) == '.tar.xz' || ext == 'txz')
+		return 'tarxz';
+	if (ext == 'tar')
+		return 'tar';
+	if (ext == 'gz')
+		return 'gz';
+	if (ext == '7z')
+		return '7z';
+	if (ext == 'iso')
+		return 'iso';
+
+	return null;
+}
+
+const ARCHIVE_TAR_FLAG = { targz: 'z', tarbz2: 'j', tarxz: 'J', tar: '' };
+
+const ARCHIVE_SUFFIX = { tar: '.tar', 'tar.gz': '.tar.gz', zip: '.zip' };
+
+function archive_bsdtar_kind(kind) {
+	return kind == 'zip' || kind == '7z' || kind == 'iso';
+}
+
+function archive_named(name, format) {
+	let suffix = ARCHIVE_SUFFIX[format] ?? '.tar.gz';
+
+	if (length(name) >= length(suffix) && substr(lc(name), length(name) - length(suffix)) == suffix)
+		return name;
+
+	return name + suffix;
+}
+
+
+function archive_output_lines(text) {
+	let n = 0;
+
+	for (let line in split(text ?? '', chr(10))) {
+		let s = trim(line);
+		if (s == '' || substr(s, 0, 2) == '$ ' || substr(s, 0, 7) == '-- exit')
+			continue;
+		n++;
+	}
+
+	return n;
+}
+
+function archive_member_selection(text) {
+	if (text == null || text == '')
+		return { members: null };
+
+	let raw = null;
+
+	try {
+		raw = json(text);
+	}
+	catch (e) {
+		return { error: tr('Invalid name') };
+	}
+
+	if (type(raw) != 'array')
+		return { error: tr('Invalid name') };
+
+	let out = [];
+
+	for (let name in raw) {
+		if (type(name) != 'string' || name == '' || substr(name, 0, 1) == '/' || index(name, '\0') >= 0)
+			return { error: tr('Invalid name') };
+
+		for (let part in split(name, '/'))
+			if (part == '..')
+				return { error: tr('Invalid name') };
+
+		push(out, name);
+	}
+
+	return { members: length(out) ? out : null };
+}
+
+function archive_extract_command(src, ext, dest_dir, members) {
+	let kind = archive_kind(src, ext);
+	let arc = shellquote(src);
+	let dest = shellquote(dest_dir);
+	let count = length(members ?? []);
+
+	if (archive_bsdtar_kind(kind)) {
+		if (count)
+			return { tool: 'bsdtar', kind: kind, list_file: ARCHIVE_SEL_FILE,
+				cmd: sprintf('cd %s && bsdtar -x -v -T %s -f %s', dest, shellquote(ARCHIVE_SEL_FILE), arc) };
+
+		return { tool: 'bsdtar', kind: kind, cmd: sprintf('cd %s && bsdtar -xvf %s', dest, arc) };
+	}
+
+	if (ARCHIVE_TAR_FLAG[kind] != null) {
+		let flag = ARCHIVE_TAR_FLAG[kind];
+
+		if (count)
+			return { tool: 'tar', kind: kind, list_file: ARCHIVE_SEL_FILE,
+				cmd: sprintf('cd %s && tar -x%s -v -T %s -f %s', dest, flag, shellquote(ARCHIVE_SEL_FILE), arc) };
+
+		return { tool: 'tar', kind: kind, cmd: sprintf('cd %s && tar -x%svf %s', dest, flag, arc) };
+	}
+
+	if (kind == 'gz') {
+		if (count)
+			return { error: tr('This archive format only supports one regular file') };
+
+		let out = replace(basename(src), /\.gz$/, '');
+		return { tool: 'gunzip', kind: kind, target: out,
+			cmd: sprintf('cd %s && gunzip -c %s > %s', dest, arc, shellquote(out)) };
+	}
+
+	return { error: tr('Unsupported archive format') };
+}
+
+function archive_tool_lines(cmd) {
+	let proc = popen(sprintf('{ %s; } 2>&1; echo "rc=$?"', cmd), 'r');
+	if (!proc)
+		return { lines: [], rc: -1 };
+
+	let out = [];
+
+	for (let line = proc.read('line'); length(line); line = proc.read('line'))
+		push(out, replace(line, chr(10), ''));
+
+	proc.close();
+
+	let rc = -1;
+	if (length(out)) {
+		let last = pop(out);
+		let m = match(last, /^rc=(-?[0-9]+)$/);
+		if (m)
+			rc = +m[1];
+		else
+			push(out, last);
+	}
+
+	return { lines: out, rc: rc };
+}
+
+function archive_parse_entries(lines, with_sizes, limit) {
+	let entries = [], seen = {}, truncated = false;
+
+	for (let raw in lines) {
+		let line = trim(raw);
+		let name = line, size = null, is_dir = false;
+
+		if (with_sizes) {
+			let m = match(line, /^[^ ]+ +[0-9]+ +[^ ]+ +[^ ]+ +([0-9]+) +[^ ]+ +[^ ]+ +[^ ]+ +(.+)$/);
+			if (!m)
+				continue;
+			size = +m[1];
+			name = m[2];
+			if (substr(line, 0, 1) == 'd')
+				is_dir = true;
+			let arrow = index(name, ' -> ');
+			if (arrow >= 0)
+				name = substr(name, 0, arrow);
+		}
+
+		if (substr(name, 0, 2) == './')
+			name = substr(name, 2);
+
+		if (substr(name, -1) == '/') {
+			is_dir = true;
+			name = substr(name, 0, length(name) - 1);
+		}
+
+		if (name == '' || name == '.' || name == '..' || seen[name])
+			continue;
+
+		if (length(entries) >= limit) {
+			truncated = true;
+			break;
+		}
+
+		seen[name] = true;
+		push(entries, { name: name, dir: is_dir, size: with_sizes ? size : null });
+	}
+
+	for (let e in entries) {
+		let parts = split(e.name, '/');
+		if (length(parts) < 2)
+			continue;
+		let path = '';
+		for (let i = 0; i < length(parts) - 1; i++) {
+			path = path == '' ? parts[i] : path + '/' + parts[i];
+			if (seen[path])
+				continue;
+			seen[path] = true;
+			push(entries, { name: path, dir: true, size: null });
+		}
+	}
+
+	return { entries: entries, truncated: truncated };
+}
+
+function archive_listing(src, ext) {
+	let kind = archive_kind(src, ext);
+	let arc = shellquote(src);
+	let cmd = null, limit = ARCHIVE_LIST_LIMIT;
+
+	if (archive_bsdtar_kind(kind))
+		cmd = sprintf('bsdtar -tvf %s', arc);
+	else if (ARCHIVE_TAR_FLAG[kind] != null)
+		cmd = sprintf('tar -t%sf %s', ARCHIVE_TAR_FLAG[kind], arc);
+	else if (kind == 'gz')
+		return { entries: [{ name: replace(basename(src), /\.gz$/, ''), dir: false, size: null }], truncated: false };
+	else
+		return { error: tr('Unsupported archive format') };
+
+	let res = archive_tool_lines(cmd);
+	let detail = '';
+
+	if (res.rc != 0) {
+		for (let raw in res.lines)
+			if (detail == '' && trim(raw) != '')
+				detail = trim(raw);
+
+		return { error: tr('List failed'), detail: substr(detail, 0, 200) };
+	}
+
+	let parsed = archive_parse_entries(res.lines, archive_bsdtar_kind(kind), limit);
+
+	return { entries: parsed.entries, truncated: parsed.truncated, exit_code: res.rc };
+}
+
+function archive_top_levels(names) {
+	let seen = {}, out = [];
+
+	for (let name in (names ?? [])) {
+		let top = split(name, '/')[0];
+		if (top == '' || seen[top])
+			continue;
+		seen[top] = true;
+		push(out, top);
+	}
+
+	return out;
+}
+
+function archive_entries(src, ext) {
+	let list = archive_listing(src, ext);
+	let names = [];
+
+	if (list.error)
+		return null;
+
+	for (let e in (list.entries ?? []))
+		push(names, e.name);
+
+	return archive_top_levels(names);
+
+	proc.close();
+	return out;
+}
+
 function api_list() {
 	let path = normalize_path(http.formvalue('path'));
 
 	if (!path)
 		return fail(http, 1, tr('Invalid path'));
+
+	let st = stat(path);
+
+	if (st && st.type != 'directory') {
+		let ext = file_extension(path);
+
+		if (!archive_kind(path, ext))
+			return fail(http, 1, tr('Not a directory'));
+
+		let list = archive_listing(path, ext);
+
+		if (list.error)
+			return fail(http, 2, list.error, { detail: list.detail ?? '' });
+
+		return ok(http, { archive: path, entries: list.entries, truncated: list.truncated ?? false });
+	}
 
 	let prefs = read_preferences();
 	let listing = list_directory(path, prefs);
@@ -2423,7 +2756,7 @@ function do_transfer(mode, batch) {
 
 		let rv = transfer_one(src, dest, mode, on_conflict,
 			rename_map[path_name(src)]);
-		push(results, { path: src, ok: rv.ok, error: rv.error });
+		push(results, { path: src, ok: rv.ok, error: rv.error, failed_item: rv.failed_item ?? null });
 		if (!rv.ok) failures++;
 	}
 
@@ -2855,58 +3188,20 @@ function begin_archive_task(task) {
 	task.done = false;
 	task.state = 'running';
 	task.started = now();
+	task.command = length(task.cmd) > 4096 ? substr(task.cmd, 0, 4096) + ' ...' : task.cmd;
 	task.pid = spawn_background(task.cmd, ARCHIVE_LOG, ARCHIVE_RC);
 	delete task.cmd;
+
+	if (!task.pid) {
+		task.state = 'failed';
+		task.done = true;
+		task.message = tr('Archive task ended unexpectedly');
+	}
+
 	write_task_state(ARCHIVE_STATE_FILE, task);
 	return task;
 }
 
-function archive_entries(src, ext) {
-	let lower = lc(src);
-	let cmd;
-
-	if (ext == 'zip')
-		cmd = sprintf('unzip -l %s 2>/dev/null', shellquote(src));
-	else if (substr(lower, -7) == '.tar.gz' || ext == 'tgz')
-		cmd = sprintf('tar -tzf %s 2>/dev/null', shellquote(src));
-	else if (substr(lower, -8) == '.tar.bz2' || ext == 'tbz')
-		cmd = sprintf('tar -tjf %s 2>/dev/null', shellquote(src));
-	else if (substr(lower, -7) == '.tar.xz' || ext == 'txz')
-		cmd = sprintf('tar -tJf %s 2>/dev/null', shellquote(src));
-	else if (ext == 'tar')
-		cmd = sprintf('tar -tf %s 2>/dev/null', shellquote(src));
-	else
-		return null;
-
-	let proc = popen(cmd, 'r');
-	if (!proc)
-		return null;
-
-	let seen = {}, out = [];
-
-	for (let line = proc.read('line'); length(line); line = proc.read('line')) {
-		let name = trim(line);
-
-		if (ext == 'zip') {
-			let m = match(name, /^[0-9]+ +[^ ]+ +[^ ]+ +(.+)$/);
-			if (!m)
-				continue;
-			name = m[1];
-		}
-
-		let top = split(name, '/')[0];
-		if (top == '' || top == '.' || top == '..')
-			continue;
-
-		if (!seen[top]) {
-			seen[top] = true;
-			push(out, top);
-		}
-	}
-
-	proc.close();
-	return out;
-}
 
 function api_archive_create_start() {
 	let dest_dir = validate_write_request(http,
@@ -2923,8 +3218,10 @@ function api_archive_create_start() {
 
 	let format = http.formvalue('format') ?? 'tar.gz';
 
-	if (format != 'tar' && format != 'tar.gz')
+	if (format != 'tar' && format != 'tar.gz' && format != 'zip')
 		return fail(http, 1, tr('Unsupported archive format'));
+
+	name = archive_named(name, format);
 
 	let sources = parse_path_array(http, 'sources') ??
 		parse_path_array(http, 'paths') ?? [];
@@ -2961,17 +3258,22 @@ function api_archive_create_start() {
 	if (existing && !remove_recursive(target))
 		return fail(http, 6, tr('Cannot replace the existing target'));
 
-	if (!have_tool('tar'))
-		return fail(http, 2, 'tar is not installed', {
-			missing_tool: 'tar',
-			package_name: TOOL_PACKAGE_MAP.tar
+	let need_tool = format == 'zip' ? 'bsdtar' : 'tar';
+
+	if (!have_tool(need_tool))
+		return fail(http, 2, sprintf(tr('%s is not installed'), need_tool), {
+			missing_tool: need_tool,
+			package_name: TOOL_PACKAGE_MAP[need_tool] ?? need_tool
 		});
 
 	let cmd = (format == 'tar')
 		? sprintf('cd %s && tar -cvf %s %s',
 			shellquote(parent), shellquote(target), join(' ', rel))
-		: sprintf('cd %s && tar -czvf %s %s',
-			shellquote(parent), shellquote(target), join(' ', rel));
+		: (format == 'zip'
+			? sprintf('cd %s && bsdtar -a -cf %s %s',
+				shellquote(parent), shellquote(target), join(' ', rel))
+			: sprintf('cd %s && tar -czvf %s %s',
+				shellquote(parent), shellquote(target), join(' ', rel)));
 
 	let task = begin_archive_task({
 		mode: 'create', format, cmd,
@@ -2996,33 +3298,20 @@ function api_archive_extract_start() {
 		return fail(http, 1, tr('Archive not found'));
 
 	let ext = file_extension(src);
-	let lower = lc(src);
-	let cmd, tool = 'tar';
+	let sel = archive_member_selection(http.formvalue('members'));
 
-	if (ext == 'zip') {
-		tool = 'unzip';
-		cmd = sprintf('unzip -o %s -d %s', shellquote(src), shellquote(dest_dir));
-	}
-	else if (substr(lower, -7) == '.tar.gz' || ext == 'tgz')
-		cmd = sprintf('tar -xzvf %s -C %s', shellquote(src), shellquote(dest_dir));
-	else if (substr(lower, -8) == '.tar.bz2' || ext == 'tbz')
-		cmd = sprintf('tar -xjvf %s -C %s', shellquote(src), shellquote(dest_dir));
-	else if (substr(lower, -7) == '.tar.xz' || ext == 'txz')
-		cmd = sprintf('tar -xJvf %s -C %s', shellquote(src), shellquote(dest_dir));
-	else if (ext == 'tar')
-		cmd = sprintf('tar -xvf %s -C %s', shellquote(src), shellquote(dest_dir));
-	else if (ext == 'gz') {
-		tool = 'gunzip';
-		cmd = sprintf('gunzip -c %s > %s', shellquote(src),
-			shellquote(join_path(dest_dir, replace(path_name(src), /\.gz$/, ''))));
-	}
-	else
-		return fail(http, 1, tr('Unsupported archive format'));
+	if (sel.error)
+		return fail(http, 1, sel.error);
 
-	if (!have_tool(tool))
-		return fail(http, 2, sprintf(tr('%s is not installed'), tool), {
-			missing_tool: tool,
-			package_name: TOOL_PACKAGE_MAP[tool] ?? tool
+	let plan = archive_extract_command(src, ext, dest_dir, sel.members);
+
+	if (plan.error)
+		return fail(http, 1, plan.error);
+
+	if (!have_tool(plan.tool))
+		return fail(http, 2, sprintf(tr('%s is not installed'), plan.tool), {
+			missing_tool: plan.tool,
+			package_name: TOOL_PACKAGE_MAP[plan.tool] ?? plan.tool
 		});
 
 	if (!mkdir_p(dest_dir))
@@ -3032,8 +3321,20 @@ function api_archive_extract_start() {
 	if (!dst || dst.type != 'directory')
 		return fail(http, 5, tr('Destination is not a directory'));
 
+	if (plan.list_file) {
+		let body = '';
+		for (let name in sel.members)
+			body += name + chr(10);
+
+		if (!writefile(plan.list_file, body))
+			return fail(http, 1, tr('Write failed'));
+
+		chmod(plan.list_file, 0o600);
+	}
+
 	if (http.formvalue('overwrite') != '1') {
-		let entries = archive_entries(src, ext);
+		let entries = plan.target ? [ plan.target ] :
+			(length(sel.members) ? archive_top_levels(sel.members) : archive_entries(src, ext));
 		let clash = [];
 
 		for (let name in (entries ?? []))
@@ -3049,7 +3350,7 @@ function api_archive_extract_start() {
 	}
 
 	let task = begin_archive_task({
-		mode: 'extract', format: ext, cmd,
+		mode: 'extract', format: ext, cmd: plan.cmd,
 		path: src, destination_path: dest_dir, target_dir: dest_dir
 	});
 
@@ -3059,27 +3360,35 @@ function api_archive_extract_start() {
 function api_archive_status() {
 	let st = read_task_state(ARCHIVE_STATE_FILE);
 
-	if (!st)
-		return ok(http, { state: 'idle', done: true, success: false });
+	if (!st) {
+		if (!task_finished(ARCHIVE_RC))
+			return ok(http, { state: 'idle', done: true, success: false });
+		return ok(http, {
+			state: task_exit_code(ARCHIVE_RC) == 0 ? 'success' : 'failed', done: true,
+			success: task_exit_code(ARCHIVE_RC) == 0, exit_code: task_exit_code(ARCHIVE_RC),
+			log: truncate_log(readfile(ARCHIVE_LOG) ?? '', 8192)
+		});
+	}
 
 	let want = http.formvalue('task_id');
 	if (want && st.task_id && want != st.task_id)
 		return ok(http, { task_id: want, state: 'gone', done: true, success: false });
 
-	if (!st.done && st.pid && !process_alive(st.pid)) {
-		let rc = trim(readfile(ARCHIVE_RC) ?? '');
-		st.exit_code = length(rc) ? +rc : 0;
-		st.success = (st.exit_code == 0);
-		st.state = st.success ? 'success' : 'failed';
-		st.done = true;
-		st.finished = now();
-		write_task_state(ARCHIVE_STATE_FILE, st);
-	}
+	if (!st.done && (task_finished(ARCHIVE_RC) || (st.pid && !process_alive(st.pid))))
+		settle_task(ARCHIVE_STATE_FILE, st, ARCHIVE_RC, null);
 
 	st.log = truncate_log(readfile(ARCHIVE_LOG) ?? '', 8192);
 
+	if (st.done && st.success && st.mode == 'extract' && archive_output_lines(st.log) == 0) {
+		st.success = false;
+		st.state = 'failed';
+		st.message = tr('The archive produced no files');
+	}
+
 	if (st.done && !st.success && !st.message)
-		st.message = sprintf(tr('Command exited with status %d'), st.exit_code ?? -1);
+		st.message = st.exit_code < 0
+			? tr('Archive task ended unexpectedly')
+			: sprintf(tr('Command exited with status %d'), st.exit_code ?? -1);
 
 	ok(http, st);
 }

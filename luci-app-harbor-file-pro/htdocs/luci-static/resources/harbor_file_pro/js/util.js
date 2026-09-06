@@ -126,7 +126,14 @@
         target_path: '/',
     };
 
-    HF.request_json = function request_json(url, data, on_ok) {
+    HF.request_json = function request_json(url, data, on_ok, on_error) {
+        function fail_hard(message) {
+            if (on_error) {
+                on_error(message);
+                return;
+            }
+            HF.set_error_status(message || HF.labels.request_failed);
+        }
         HF.Util.ajax({
             url: url,
             type: 'GET',
@@ -134,13 +141,13 @@
             dataType: 'json',
             success: function(res) {
                 if (!res || res.code !== 0) {
-                    HF.set_error_status(res && res.message ? res.message : HF.labels.request_failed);
+                    fail_hard(res && res.message ? res.message : HF.labels.request_failed);
                     return;
                 }
                 on_ok(res.data || {});
             },
             error: function(xhr) {
-                HF.set_error_status(HF.labels.request_failed + ': HTTP ' + xhr.status);
+                fail_hard(HF.labels.request_failed + ': HTTP ' + xhr.status);
             }
         });
     }

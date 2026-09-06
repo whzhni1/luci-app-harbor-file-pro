@@ -1232,6 +1232,104 @@
     box-shadow: 0 0 0 2px var(--fm-accent-soft);
 }
 
+.fm-extract-head{
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.6em;
+    margin-top: 0.5em;
+}
+
+.fm-extract-all{
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35em;
+    cursor: pointer;
+}
+
+.fm-extract-count{
+    color: var(--fm-muted);
+    font-size: 0.85em;
+}
+
+.fm-extract-list{
+    max-height: 15em;
+    overflow-y: auto;
+    border: 1px solid rgba(128, 128, 128, 0.25);
+    border-radius: 0.35em;
+    padding: 0.25em 0;
+    margin-top: 0.25em;
+}
+
+.fm-pref-sized-dialog .fm-form-body{
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.fm-pref-sized-dialog .fm-extract-list{
+    flex: 1 1 auto;
+    min-height: 6em;
+    max-height: none;
+}
+
+.fm-extract-list:empty{
+    display: none;
+}
+
+.fm-extract-row{
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+    padding: 0.15em 0.6em;
+    cursor: pointer;
+}
+
+.fm-extract-fold{
+    flex: 0 0 auto;
+    width: 1em;
+    text-align: center;
+    color: var(--fm-muted);
+    cursor: pointer;
+    user-select: none;
+}
+
+.fm-extract-fold:hover{
+    color: inherit;
+}
+
+.fm-extract-row.is-plain{
+    cursor: default;
+}
+
+.fm-extract-row.is-plain:hover{
+    background: none;
+}
+
+.fm-extract-row:hover{
+    background: rgba(128, 128, 128, 0.12);
+}
+
+.fm-extract-row.is-dir .fm-extract-name{
+    font-weight: 600;
+}
+
+.fm-extract-name{
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.fm-extract-size{
+    flex: 0 0 auto;
+    color: var(--fm-muted);
+    font-size: 0.85em;
+}
+
 .fm-form-help{
     margin: -2px 0 12px;
     overflow-wrap: anywhere;
@@ -2562,6 +2660,12 @@
     padding-left: 4px;
 }
 
+.fm-fav-panel,
+.fm-tool-dropdown,
+.fm-context-menu{
+    touch-action: pan-y;
+}
+
 .fm-fav-panel{
     --fm-accent: #2878d4;
     --fm-accent-soft: #e8f2fd;
@@ -2601,6 +2705,7 @@
 }
 
 .fm-fav-head{
+    touch-action: none;
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -2664,7 +2769,8 @@
     text-align: left;
 }
 
-.fm-fav-icon{
+.fm-fav-icon,
+.fm-extract-icon{
     width: 17px;
     height: 17px;
     flex: 0 0 auto;

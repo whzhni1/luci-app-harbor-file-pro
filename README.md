@@ -1,7 +1,7 @@
 
 # Harbor File Pro: Smoother File Management for OpenWrt
 
-[**中文版本**](./CN_README.md) | Chinese
+[**中文版本**](./CN_README.md) | Switch to Chinese
 
 **Harbor File Pro** is a deeply enhanced OpenWrt file manager based on [destan19/luci-app-harbor-file](https://github.com/destan19/luci-app-harbor-file).  
 While retaining all the excellent features of the original, I have spent my spare time on **code refactoring** and **dozens of practical new features**. Since multiple pull requests were not merged upstream, I have released it independently as the **Pro Edition**.  
@@ -16,6 +16,8 @@ While retaining all the excellent features of the original, I have spent my spar
 ![3](images/3.png)  
 ![4](images/4.png)  
 ![5](images/5.png)
+![6](images/6.png)
+
 
 ---
 

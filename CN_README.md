@@ -1,6 +1,6 @@
 ​# Harbor File Pro：让 OpenWrt 文件管理更丝滑
 
-[**English**](./README.md) | English
+[**English**](./README.md) | Switch to English
 
 **Harbor File Pro** 是一款基于 [destan19/luci-app-harbor-file](https://github.com/destan19/luci-app-harbor-file) 深度增强的 OpenWrt 文件管理器。  
 在保留原版所有优秀功能的基础上，利用业余时间完成了**代码重构**和**数十项实用新功能**，因多次提交未获上游合并，遂独立为 **Pro 版**。  
@@ -16,6 +16,7 @@
 ![3](images/3.png)  
 ![4](images/4.png)  
 ![5](images/5.png)
+![6](images/6.png)
 
 ---
 
@@ -123,4 +124,3 @@ wget -q -O - "https://gitlab.com/whzhni/tailscale/-/raw/main/Auto_Install_Script
 ---
 
 **Harbor File Pro** —— 让 OpenWrt 文件管理，像使用 Windows 一样简单，却比原版更加强大。欢迎体验！
-
