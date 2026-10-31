@@ -788,9 +788,13 @@ window.HarborFile.tr = function (msgid) {
                     <input type="checkbox" class="perm-check">
                     <input type="checkbox" class="perm-check">
                 </div>
-                <label id="fm_property_recursive_option" class="fm-overwrite-options" style="grid-column:2;margin-top:0;display:none" title="{{ _('Symbolic links are skipped. The same permission bits are applied to files and directories.') }}">
+                <label id="fm_property_recursive_option" class="fm-overwrite-options" style="grid-column:2;margin-top:0;display:none" title="{{ _('Symbolic links are skipped.') }}">
                     <input id="fm_property_recursive" type="checkbox">
                     <span>{{ _('Recursive permissions') }}</span>
+                </label>
+                <label id="fm_property_recursive_directories_option" class="fm-overwrite-options" style="grid-column:2;margin-top:0;display:none" title="{{ _('When cleared, only regular files are changed. The selected directory and all subdirectories keep their permissions.') }}">
+                    <input id="fm_property_recursive_directories" type="checkbox" checked disabled>
+                    <span>{{ _('Apply to directories') }}</span>
                 </label>
                 <div class="fm-property-label">{{ _('Octal') }}</div><div class="fm-property-value fm-flex-row">
                     <input id="fm_property_mode_input" type="text" size="4" maxlength="4" pattern="[0-7]{3,4}" style="width:50px;">

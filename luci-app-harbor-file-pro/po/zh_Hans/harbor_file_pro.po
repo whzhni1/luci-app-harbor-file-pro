@@ -1441,8 +1441,8 @@ msgstr "保留目标位置已有文件的权限位；不保留所属用户、用
 msgid "Recursive permissions"
 msgstr "递归权限"
 
-msgid "Symbolic links are skipped. The same permission bits are applied to files and directories."
-msgstr "跳过符号链接。文件和目录都应用相同的权限位。"
+msgid "Symbolic links are skipped."
+msgstr "跳过符号链接。"
 
 msgid "Failed to update some permissions"
 msgstr "部分项目权限更新失败"
@@ -1935,3 +1935,9 @@ msgstr "无效的上传目录"
 
 msgid "Invalid directory path"
 msgstr "无效的目录路径"
+
+msgid "Apply to directories"
+msgstr "对目录生效"
+
+msgid "When cleared, only regular files are changed. The selected directory and all subdirectories keep their permissions."
+msgstr "取消勾选后仅修改普通文件，当前目录和所有子目录的权限保持不变。"

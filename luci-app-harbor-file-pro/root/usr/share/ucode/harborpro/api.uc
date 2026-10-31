@@ -3234,6 +3234,10 @@ function api_chmod() {
 		return ok(http, { path, mode: modestr });
 	}
 
+	let directory_option = http.formvalue('recursive_directories');
+	if (directory_option != null && ((type(directory_option) != 'string' && type(directory_option) != 'int') || ('' + directory_option != '0' && '' + directory_option != '1')))
+		return fail(http, 1, tr('Invalid value'));
+	let apply_directories = directory_option != '0';
 	let root = _fs.lstat(path);
 	if (!root || root.type != 'directory') return fail(http, 1, tr('Not a directory'));
 	let prefs = read_preferences();
@@ -3260,6 +3264,7 @@ function api_chmod() {
 				if (name != '.' && name != '..') push(pending, { path: join_path(p, name) });
 			continue;
 		}
+		if (!apply_directories && st.type != 'file') { skipped++; continue; }
 		if (chmod(p, mode)) changed++;
 		else record_failure(p);
 	}
