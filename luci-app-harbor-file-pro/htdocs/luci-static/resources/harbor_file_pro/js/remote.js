@@ -462,16 +462,33 @@
             job.timer = setTimeout(function() { pollInstall(job); }, 2000);
         });
     }
+    HF.settings_tool_row = toolRow;
+    HF.settings_tool_button = toolButton;
+    HF.settings_tool_status = toolStatus;
+    HF.install_settings_tool = installTool;
     function installTool(tool) {
+        if (HF.state.settings_tool_starting || HF.state.install_task && !HF.state.install_task.done) return;
+        HF.state.settings_tool_starting = true;
+        if (HF.render_prism_settings) HF.render_prism_settings();
         HF.request_write(HF.api.tool_install_start, { tool: tool === 'ssh' ? 'openssh-client' : tool === 'stat' ? 'coreutils-stat' : tool }, '', function(data) {
+            HF.state.settings_tool_starting = false;
             HF.state.install_item = { name: tool, path: tool };
             HF.update_package_install_view(data || {});
-            HF.open_modal('fm_package_install_dialog'); HF.poll_package_install(data.task_id);
+            HF.open_modal('fm_package_install_dialog');
+            if (!data.done) HF.poll_package_install(data.task_id);
+        }, function() {
+            HF.state.settings_tool_starting = false;
+            if (HF.render_prism_settings) HF.render_prism_settings();
         });
     }
     var installView = HF.update_package_install_view;
     HF.update_package_install_view = function(data) {
         installView(data);
+        var tool = HF.state.install_item && HF.state.install_item.name;
+        if (tool === 'curl' && HF.render_prism_settings) {
+            HF.render_prism_settings();
+            if (data && data.done && document.getElementById('fm_settings_prism').checked) HF.read_prism_status();
+        }
         if (data && data.done && document.getElementById('fm_settings_panel_remote').classList.contains('active')) HF.render_remote_settings();
     };
     HF.run_remote_paste = function(targetPath) {
@@ -583,7 +600,7 @@
             select.addEventListener('change', function() {
                 var picker = HF.state.target_picker;
                 if (!picker || !picker.allow_devices) return;
-                select.title = select.options[select.selectedIndex].title;
+                sizeDevice();
                 picker.device_id = select.value; picker.device_revision = '';
                 HF.state.target_path = null; HF.state.target_parent = null; HF.state.target_has_operation_space = false;
                 HF.clear_node(document.getElementById('fm_target_list'));
@@ -591,6 +608,12 @@
                 HF.render_target_address();
                 HF.load_target_directory(picker.device_paths[picker.device_id] || (picker.device_id ? lastPaths[picker.device_id] : HF.state.navigation.home_dir) || '/', true);
             });
+        }
+        function sizeDevice() {
+            var option = select.options[select.selectedIndex];
+            if (!option) return;
+            select.title = option.title;
+            HF.size_select_to_content(select);
         }
         select.hidden = !options.allow_devices;
         if (!options.allow_devices) return;
@@ -605,7 +628,7 @@
         devices.forEach(function(d) { option(d.id, d.name); });
         if (options.device_id && !devices.has(options.device_id)) option(options.device_id, options.device_id + ' · ' + label('unavailable'), true);
         select.value = options.device_id;
-        select.title = select.options[select.selectedIndex].title;
+        sizeDevice();
         options.load = function(path, okay, failed, active) {
             if (!options.device_id) { HF.request_json(HF.api.list, { path: path }, okay, failed); return; }
             var id = options.device_id;

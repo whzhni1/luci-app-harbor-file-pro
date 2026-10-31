@@ -64,7 +64,7 @@
     };
 
     HF.set_settings_tab = function set_settings_tab(tab) {
-        var next_tab = ['basic', 'nginx', 'remote'].indexOf(tab) >= 0 ? tab : 'basic';
+        var next_tab = ['basic', 'editor', 'nginx', 'remote'].indexOf(tab) >= 0 ? tab : 'basic';
         var tabs = document.querySelectorAll('[data-settings-tab]');
         for (var i = 0; i < tabs.length; i++) {
             var active = tabs[i].getAttribute('data-settings-tab') === next_tab;
@@ -72,6 +72,8 @@
             tabs[i].setAttribute('aria-selected', active ? 'true' : 'false');
         }
         document.getElementById('fm_settings_panel_basic').classList.toggle('active', next_tab === 'basic');
+        document.getElementById('fm_settings_panel_editor').classList.toggle('active', next_tab === 'editor');
+        if (next_tab === 'editor' && HF.render_prism_settings) HF.render_prism_settings(true);
         document.getElementById('fm_settings_panel_nginx').classList.toggle('active', next_tab === 'nginx');
         document.getElementById('fm_settings_panel_remote').classList.toggle('active', next_tab === 'remote');
         if (next_tab === 'remote' && HF.render_remote_settings) HF.render_remote_settings();
@@ -153,6 +155,10 @@
         document.getElementById('fm_settings_thumbnails').checked = HF.state.preferences.enable_thumbnails === 1;
         document.getElementById('fm_settings_auto_indent').checked = HF.state.preferences.editor_auto_indent === 1;
         document.getElementById('fm_settings_auto_wrap').checked = HF.state.preferences.editor_auto_wrap === 1;
+        document.getElementById('fm_settings_line_numbers').checked = HF.state.preferences.show_line_numbers === 1;
+        document.getElementById('fm_settings_prism').checked = HF.state.preferences.editor_prism === 1;
+        document.getElementById('fm_prism_source').value = HF.state.preferences.editor_prism_source || 'npmmirror';
+        if (HF.render_prism_settings) HF.render_prism_settings();
         document.getElementById('fm_settings_restore_last_directory').checked = HF.state.preferences.restore_last_directory === 1;
         document.getElementById('fm_settings_uwsgi_request_buffering').checked =
             HF.state.preferences.uwsgi_request_buffering === 1;
@@ -202,8 +208,6 @@
         var next_system_operations = document.getElementById('fm_settings_system_operations').checked ? 1 : 0;
         var next_show_hidden = document.getElementById('fm_settings_show_hidden').checked ? 1 : 0;
         var next_thumbnails = document.getElementById('fm_settings_thumbnails').checked ? 1 : 0;
-        var next_auto_indent = document.getElementById('fm_settings_auto_indent').checked ? 1 : 0;
-        var next_auto_wrap = document.getElementById('fm_settings_auto_wrap').checked ? 1 : 0;
         var next_restore_dir = document.getElementById('fm_settings_restore_last_directory').checked ? 1 : 0;
         if (next_home_dir.charAt(0) !== '/') {
             HF.set_warning_status(HF.labels.invalid_path);
@@ -218,8 +222,6 @@
             show_hidden_files: next_show_hidden,
             allow_system_operations: next_system_operations,
             enable_thumbnails: next_thumbnails,
-            editor_auto_indent: next_auto_indent,
-            editor_auto_wrap: next_auto_wrap,
             restore_last_directory: next_restore_dir
         }, HF.labels.settings_saved, function(data) {
             HF.close_modal();
@@ -227,6 +229,24 @@
             HF.refresh_navigation(HF.refresh_current);
         });
     }
+
+    HF.save_editor_settings_dialog = function save_editor_settings_dialog() {
+        var save = document.getElementById('fm_settings_editor_save');
+        if (save.disabled) return;
+        var controls = ['fm_settings_auto_indent', 'fm_settings_auto_wrap', 'fm_settings_prism', 'fm_settings_line_numbers', 'fm_settings_editor_save', 'fm_settings_editor_cancel', 'fm_prism_source'].map(function(id) { return document.getElementById(id); });
+        var record = document.getElementById('fm_settings_dialog')._fmWindow;
+        var before = record && record.before_close;
+        if (record) record.before_close = function() { return false; };
+        var values = { section: 'editor', editor_prism_source: document.getElementById('fm_prism_source').value };
+        ['editor_auto_indent', 'editor_auto_wrap', 'editor_prism', 'show_line_numbers'].forEach(function(key, index) { values[key] = controls[index].checked ? 1 : 0; });
+        controls.forEach(function(node) { node.disabled = true; });
+        function finish() {
+            controls.forEach(function(node) { node.disabled = false; });
+            if (record) record.before_close = before;
+            if (HF.render_prism_settings) HF.render_prism_settings();
+        }
+        HF.save_preferences(values, HF.labels.settings_saved, finish, finish);
+    };
 
     HF.save_uhttpd_settings_dialog = function save_uhttpd_settings_dialog() {
         var button = document.getElementById('fm_settings_nginx_save');
@@ -873,7 +893,6 @@
             });
             inputs[kind] = input;
         });
-        element('p', content, 'Changes are previewed only. Save to keep them.', 'fm-glass-hint');
         var error = element('div', content, '', 'fm-glass-error');
         error.setAttribute('role', 'alert');
         var resets = element('div', content, '', 'fm-glass-actions');

@@ -16,6 +16,17 @@
         if (dialog && dialog._fmWindow) HF.window_manager.close(dialog._fmWindow);
         else if (dialog) dialog.style.display = 'none';
     };
+    HF.size_select_to_content = function size_select_to_content(select) {
+        var option = select.options[select.selectedIndex];
+        if (!option) return;
+        var style = getComputedStyle(select);
+        var measure = select._fmMeasure || (select._fmMeasure = document.createElement('canvas').getContext('2d'));
+        if (!measure) { select.style.width = 'auto'; return; }
+        measure.font = style.font || style.fontSize + ' ' + style.fontFamily;
+        select.style.width = Math.ceil(measure.measureText(option.textContent).width +
+            (parseFloat(style.paddingLeft) || 0) + (parseFloat(style.paddingRight) || 0) +
+            (parseFloat(style.borderLeftWidth) || 0) + (parseFloat(style.borderRightWidth) || 0)) + 'px';
+    };
     HF.permBits = [8,7,6, 5,4,3, 2,1,0];
     HF.icon_base = HF.resource + 'icons/';
     HF.status_duration_fast = 1500;
@@ -53,6 +64,8 @@
             enable_thumbnails: 0,
             editor_auto_indent: 0,
             editor_auto_wrap: 0,
+            editor_prism: 1,
+            editor_prism_source: 'npmmirror',
             restore_last_directory: 0,
             show_line_numbers: 0,
             last_directory: '',
@@ -679,7 +692,7 @@
             window.addEventListener('blur', end_drag);
         });
         if (options.selectText) {
-            node.title = HF.tr('Drag to scroll; Shift-drag to select text');
+            node.title = HF.tr('Drag to scroll horizontally; Shift-drag to select text');
             node.addEventListener('dragstart', function(event) {
                 event.preventDefault();
                 event.stopPropagation();

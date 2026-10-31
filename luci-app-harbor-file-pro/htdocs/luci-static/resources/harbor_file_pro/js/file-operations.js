@@ -924,6 +924,8 @@
         HF.state.preferences.enable_thumbnails = thumbnail_value === 1 ? 1 : 0;
         HF.state.preferences.editor_auto_indent = auto_indent_value === 1 ? 1 : 0;
         HF.state.preferences.editor_auto_wrap = auto_wrap_value === 1 ? 1 : 0;
+        HF.state.preferences.editor_prism = data && Number(data.editor_prism) === 0 ? 0 : 1;
+        HF.state.preferences.editor_prism_source = data && ['jsdelivr', 'npmmirror', 'unpkg'].indexOf(data.editor_prism_source) >= 0 ? data.editor_prism_source : 'npmmirror';
         HF.state.preferences.restore_last_directory = restore_dir_value === 1 ? 1 : 0;
         if (typeof last_dir_value === 'string' && last_dir_value.charAt(0) === '/') {
             HF.state.preferences.last_directory = last_dir_value;
@@ -988,6 +990,8 @@
         }
         HF.state.view_mode = HF.value_to_view_mode(HF.state.preferences.view_mode);
         HF.apply_editor_wrap_to_windows();
+        HF.apply_line_numbers_to_windows();
+        if (HF.apply_prism_to_windows) HF.apply_prism_to_windows();
         HF.apply_theme();
         HF.fit_frame();
     }
@@ -1004,11 +1008,16 @@
     }
 
     HF.save_preferences = function save_preferences(options, success_message, on_ok, on_error) {
-        var section = options && options.section === 'appearance' ? 'appearance' :
+        var section = options && options.section === 'editor' ? 'editor' :
+            options && options.section === 'appearance' ? 'appearance' :
             options && options.section === 'window' ? 'window' :
             (options && (options.section === 'nginx' || options.section === 'web_server') ? 'web_server' : 'basic');
         var payload = { section: section };
-        if (section === 'appearance') {
+        if (section === 'editor') {
+            ['editor_auto_indent', 'editor_auto_wrap', 'editor_prism', 'editor_prism_source', 'show_line_numbers'].forEach(function(key) {
+                if (options[key] !== undefined) payload[key] = options[key];
+            });
+        } else if (section === 'appearance') {
             ['theme'].concat(Object.keys(HF.glass_defaults)).forEach(function(key) {
                 if (options[key] !== undefined) payload[key] = options[key];
             });
@@ -1054,17 +1063,23 @@
             payload.full_width = options && options.full_width !== undefined ? options.full_width : HF.state.preferences.full_width;
             payload.enable_thumbnails = options && options.enable_thumbnails !== undefined ?
                 options.enable_thumbnails : HF.state.preferences.enable_thumbnails;
-            payload.editor_auto_indent = options && options.editor_auto_indent !== undefined ?
-                options.editor_auto_indent : HF.state.preferences.editor_auto_indent;
-            payload.editor_auto_wrap = options && options.editor_auto_wrap !== undefined ?
-                options.editor_auto_wrap : HF.state.preferences.editor_auto_wrap;
             payload.restore_last_directory = options && options.restore_last_directory !== undefined ?
                 options.restore_last_directory : HF.state.preferences.restore_last_directory;
             payload.update_mirror = options && options.update_mirror !== undefined ?
                 options.update_mirror : HF.state.preferences.update_mirror;
         }
         HF.request_write(HF.api.save_preferences, payload, success_message || '', function(data) {
-            if (section === 'window') {
+            if (section === 'editor') {
+                ['editor_auto_indent', 'editor_auto_wrap', 'editor_prism', 'show_line_numbers'].forEach(function(key) {
+                    var value = data && data[key] !== undefined ? data[key] : payload[key];
+                    if (value !== undefined) HF.state.preferences[key] = Number(value) === 1 ? 1 : 0;
+                });
+                var source = data && data.editor_prism_source !== undefined ? data.editor_prism_source : payload.editor_prism_source;
+                if (['jsdelivr', 'npmmirror', 'unpkg'].indexOf(source) >= 0) HF.state.preferences.editor_prism_source = source;
+                HF.apply_editor_wrap_to_windows();
+                HF.apply_line_numbers_to_windows();
+                if (HF.apply_prism_to_windows) HF.apply_prism_to_windows();
+            } else if (section === 'window') {
                 var width_key = payload.window_target === 'mobile' ? 'mobile_window_width' : 'window_width';
                 var height_key = payload.window_target === 'mobile' ? 'mobile_window_height' : 'window_height';
                 HF.state.preferences[width_key] = Math.max(180, Math.min(4096,
@@ -1082,7 +1097,7 @@
             if (on_ok) {
                 on_ok(data || payload);
             }
-        }, on_error, section === 'appearance' ? { quietError: true, timeout: 15000 } : null);
+        }, on_error, section === 'appearance' || section === 'editor' ? { quietError: section === 'appearance', timeout: 15000 } : null);
     }
 
     HF.load_preferences = function load_preferences(on_done) {
@@ -1342,6 +1357,15 @@
     HF.page_is_zoomed = function page_is_zoomed() {
         return !!(window.visualViewport && window.visualViewport.width < document.documentElement.clientWidth - 2);
     }
+
+    HF.update_zoom_navigation = function update_zoom_navigation() {
+        var desktopTouch = document.documentElement.clientWidth > 760 &&
+            ('ontouchstart' in window || navigator.maxTouchPoints > 0);
+        document.documentElement.classList.toggle('fm-native-page-pan', desktopTouch && HF.page_is_zoomed());
+    };
+    if (window.visualViewport) window.visualViewport.addEventListener('resize', HF.update_zoom_navigation, { passive: true });
+    window.addEventListener('resize', HF.update_zoom_navigation, { passive: true });
+    HF.update_zoom_navigation();
 
     HF.native_touch_navigation = function native_touch_navigation(event) {
         return !!(event && event.touches && event.touches.length > 1);
@@ -5442,9 +5466,17 @@
         }, 800);
     }
 
+    HF.apply_line_numbers_to_windows = function apply_line_numbers_to_windows() {
+        var on = HF.state.preferences.show_line_numbers === 1;
+        (HF.window_manager && HF.window_manager.records || []).forEach(function(record) {
+            if (!record.closed && record.options && record.options.applyLineNumbers) record.options.applyLineNumbers(on);
+        });
+    };
+
     HF.save_show_line_numbers = function save_show_line_numbers(value) {
         var next = value === 1 ? 1 : 0;
         HF.state.preferences.show_line_numbers = next;
+        HF.apply_line_numbers_to_windows();
         HF.Util.ajax({
             url: HF.api.save_show_line_numbers,
             type: 'POST',

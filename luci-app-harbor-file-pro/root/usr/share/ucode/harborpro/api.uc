@@ -113,6 +113,8 @@ const PREFERENCE_DEFAULTS = {
 	enable_thumbnails: 1,
 	editor_auto_indent: 1,
 	editor_auto_wrap: 0,
+	editor_prism: 1,
+	editor_prism_source: 'npmmirror',
 	restore_last_directory: 1,
 	show_line_numbers: 1,
 	last_directory: '',
@@ -399,6 +401,8 @@ function read_preferences() {
 		enable_thumbnails:       normalize_number(g('enable_thumbnails'), PREFERENCE_DEFAULTS.enable_thumbnails, BOOLEAN_VALUES),
 		editor_auto_indent:      normalize_number(g('editor_auto_indent'), PREFERENCE_DEFAULTS.editor_auto_indent, BOOLEAN_VALUES),
 		editor_auto_wrap:        normalize_number(g('editor_auto_wrap'), PREFERENCE_DEFAULTS.editor_auto_wrap, BOOLEAN_VALUES),
+		editor_prism:            normalize_number(g('editor_prism'), PREFERENCE_DEFAULTS.editor_prism, BOOLEAN_VALUES),
+		editor_prism_source:     index(['jsdelivr', 'npmmirror', 'unpkg'], g('editor_prism_source')) >= 0 ? g('editor_prism_source') : PREFERENCE_DEFAULTS.editor_prism_source,
 		restore_last_directory:  normalize_number(g('restore_last_directory'), PREFERENCE_DEFAULTS.restore_last_directory, BOOLEAN_VALUES),
 		show_line_numbers:       normalize_number(g('show_line_numbers'), PREFERENCE_DEFAULTS.show_line_numbers, BOOLEAN_VALUES),
 		last_directory:          '' + (g('last_directory') ?? ''),
@@ -1176,8 +1180,8 @@ function api_preferences() {
 
 const BOOL_KEYS = [
 	'allow_system_operations', 'show_hidden_files', 'enable_thumbnails',
-	'editor_auto_indent', 'editor_auto_wrap', 'restore_last_directory',
-	'show_line_numbers', 'full_width'
+	'restore_last_directory',
+	'full_width'
 ];
 
 function api_save_preferences() {
@@ -1185,6 +1189,28 @@ function api_save_preferences() {
 
 	if (section == 'nginx')
 		section = 'web_server';
+
+	if (section == 'editor') {
+		if (http.getenv('REQUEST_METHOD') != 'POST')
+			return write_json_status(http, 405, 'Method Not Allowed', { code: 1, message: 'POST required' });
+		let values = {};
+		for (let key in [ 'editor_auto_indent', 'editor_auto_wrap', 'editor_prism', 'show_line_numbers' ]) {
+			let value = http.formvalue(key);
+			if (value == null) continue;
+			if ((type(value) != 'string' && type(value) != 'int') || ('' + value != '0' && '' + value != '1'))
+				return write_json_status(http, 400, 'Bad Request', { code: 1, message: tr('Invalid editor setting') });
+			values[key] = value;
+		}
+		let source = http.formvalue('editor_prism_source');
+		if (source != null) {
+			if (type(source) != 'string' || index(['jsdelivr', 'npmmirror', 'unpkg'], source) < 0)
+				return write_json_status(http, 400, 'Bad Request', { code: 1, message: tr('Invalid editor setting') });
+			values.editor_prism_source = source;
+		}
+		if (length(values) && save_preference_values(values))
+			return write_json_status(http, 500, 'Save Failed', { code: 1, message: tr('Save editor settings failed') });
+		return ok(http, read_preferences());
+	}
 
 	if (section == 'appearance') {
 		if (http.getenv('REQUEST_METHOD') != 'POST')
@@ -1930,7 +1956,7 @@ function transfer_one(src, dest_dir, mode, on_conflict, forced_name, preserve_pe
 		if (!copy_recursive(src, target, move_fail, preserve_permissions))
 			return { ok: false, error: tr('Move failed'), failed_item: move_fail.path ?? src };
 		if (!remove_recursive(src))
-			return { ok: false, error: tr('Move succeeded but source could not be removed'), failed_item: src };
+			return { ok: false, error: tr('Content copied, but source removal failed; move incomplete'), failed_item: src };
 		return { ok: true, error: null };
 	}
 

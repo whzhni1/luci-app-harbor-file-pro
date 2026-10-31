@@ -3415,8 +3415,8 @@ html[data-harbor-file-manager] #view.fm-fluid-host{
 }
 
 .fm-target-device{
-    width: 10rem;
-    max-width: min(10rem, 38%);
+    width: auto;
+    max-width: min(22rem, 45%);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -3442,6 +3442,7 @@ html[data-harbor-file-manager] #view.fm-fluid-host{
 .fm-remote-password .fm-dialog-action {
     flex: 0 0 34px;
     min-width: 34px;
+    height: auto;
     padding: 0;
 }
 
@@ -3452,6 +3453,13 @@ html[data-harbor-file-manager] #view.fm-fluid-host{
 .fm-remote-settings .fm-remote-editor .fm-remote-password .fm-settings-control {
     flex: 1 1 0;
     width: 0;
+}
+
+@media (max-width: 760px) {
+    .fm-remote-settings .fm-remote-editor .fm-remote-password {
+        flex: 0 0 auto;
+        width: 100%;
+    }
 }
 
 .fm-remote-terminal{
@@ -3543,7 +3551,7 @@ html[data-harbor-theme] .fm-glass-tuner{
 html[data-harbor-theme] .fm-glass-tuner .fm-window-body{
     overflow: auto;
     min-height: 0;
-    overscroll-behavior: contain;
+    overscroll-behavior: auto contain;
 }
 
 .fm-glass-tuner-content{
@@ -3589,8 +3597,7 @@ html[data-harbor-theme] .fm-glass-field input[type="range"]{
     touch-action: pan-y;
 }
 
-.fm-glass-current,
-.fm-glass-hint{
+.fm-glass-current{
     margin: 0;
     color: var(--fm-muted);
     font-size: 12px;
@@ -3658,3 +3665,30 @@ html[data-harbor-theme] .fm-details{
     backdrop-filter: blur(var(--fm-glass-blur));
 }
 
+
+html[data-harbor-file-manager] #fm_prism_details[hidden],
+html[data-harbor-file-manager] #fm_prism_update[hidden]{
+    display: none;
+}
+
+html[data-harbor-file-manager] #fm_prism_details .fm-nginx-actions{
+    flex: 0 1 auto;
+    min-width: 0;
+    max-width: 100%;
+    flex-wrap: wrap;
+}
+
+html[data-harbor-file-manager] #fm_prism_status{
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+
+html.fm-native-page-pan #fm_content{
+    overflow-x: hidden;
+}
+
+html[data-harbor-file-manager] #fm_prism_source{
+    width: auto;
+    min-width: 0;
+    max-width: 100%;
+}

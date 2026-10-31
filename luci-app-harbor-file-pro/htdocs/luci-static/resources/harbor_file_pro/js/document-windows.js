@@ -40,26 +40,46 @@
         html:   { quotes: '"\'', line: false, block: false, open: /<[^/!?][^>]*[^/]>\s*$|[{([]\s*$/, cont: false, close: /^<\/|^-->|^[})\]]/ }
     };
 
+    HF.wm_editor_language = function wm_editor_language(path, text) {
+        var p = String(path || '').toLowerCase(), name = p.split('/').pop();
+        var ext = name.indexOf('.') >= 0 ? name.split('.').pop() : '';
+        var first = String(text || '').slice(0, 4096).split(/\r?\n/, 1)[0].replace(/^\uFEFF/, '');
+        var words;
+        var command = '';
+        if (/^#!/.test(first)) {
+            words = first.slice(2, 4096).trim().match(/"[^"]*"|'[^']*'|[^\s]+/g) || [];
+            words = words.map(function(word) { return word.replace(/^(?:"(.*)"|'(.*)')$/, function(_, a, b) { return a === undefined ? b : a; }); });
+            command = (words.shift() || '').split('/').pop();
+            if (command === 'env') {
+                command = '';
+                while (words.length) {
+                    var word = words.shift();
+                    if (word === '-u' || word === '--unset' || word === '-C' || word === '--chdir') { words.shift(); continue; }
+                    if (word === '-S' || word === '--split-string') { words = (words.shift() || '').split(/\s+/).concat(words); continue; }
+                    if (word === '--') { command = (words.shift() || '').split('/').pop(); break; }
+                    if (word[0] === '-' || /^[A-Za-z_][A-Za-z0-9_]*=/.test(word)) continue;
+                    command = word.split('/').pop(); break;
+                }
+            }
+        }
+        if (command === 'busybox') command = words.shift() || '';
+        var interpreted = /^(?:ba|a|z|da|k)?sh$/.test(command) ? 'bash' : /^python(?:[0-9.]+)?$/.test(command) ? 'python' : /^lua(?:[0-9.]+)?$/.test(command) ? 'lua' : command === 'ucode' ? 'ucode' : /^(node|nodejs)$/.test(command) ? 'javascript' : '';
+        var language = interpreted;
+        if (!language && !command) {
+            if (p.indexOf('/etc/init.d/') === 0 || ['.bashrc', '.profile', '.bash_profile', '.zshrc'].indexOf(name) >= 0) language = 'bash';
+            else if (/^\/etc\/config\/[^/]+$/.test(p)) language = 'uci';
+            else if (/(^|\/)nginx(\.conf$|\/)/.test(p)) language = 'nginx';
+            else language = ({ uc:'ucode', js:'javascript', mjs:'javascript', cjs:'javascript', json:'json', jsonc:'json', css:'css',
+                htm:'markup', html:'markup', xml:'markup', svg:'markup', sh:'bash', bash:'bash', zsh:'bash', lua:'lua', py:'python', yaml:'yaml', yml:'yaml', ini:'ini' })[ext] || '';
+        }
+        var indent = ({ ucode:'c', javascript:'c', json:'c', css:'c', markup:'html', bash:'shell', lua:'lua', python:'python', yaml:'yaml', ini:'ini', uci:'ini', nginx:'ini' })[language];
+        if (!indent) indent = ({ ts:'c', scss:'c', c:'c', h:'c', cpp:'c', cc:'c', hpp:'c', java:'c', go:'c', rs:'c', php:'c', ut:'html', awk:'shell', conf:'ini', cfg:'ini', toml:'ini' })[ext];
+        return { language: language, indent: indent || '' };
+    };
+
     HF.wm_indent_profile_for = function wm_indent_profile_for(path, first_line) {
-        var p = String(path || ''), name = p.split('/').pop();
-        var ext = name.indexOf('.') >= 0 ? name.split('.').pop().toLowerCase() : '';
-        var shebang = (String(first_line || '').match(/^#!\S*/) || [''])[0];
-        if (/ucode$/.test(shebang)) return HF.wm_indent_profiles.c;
-        if (/lua$/.test(shebang)) return HF.wm_indent_profiles.lua;
-        if (/python/.test(shebang)) return HF.wm_indent_profiles.python;
-        if (/(ba|a|z|da)?sh$/.test(shebang) || p.indexOf('/etc/init.d/') === 0) return HF.wm_indent_profiles.shell;
-        if (['.bashrc', '.profile', '.bash_profile', '.zshrc'].indexOf(name) >= 0) return HF.wm_indent_profiles.shell;
-        if (p.indexOf('/etc/config/') === 0) return HF.wm_indent_profiles.ini;
-        var map = {
-            uc: 'c', js: 'c', mjs: 'c', ts: 'c', json: 'c', css: 'c', scss: 'c',
-            c: 'c', h: 'c', cpp: 'c', cc: 'c', hpp: 'c', java: 'c', go: 'c', rs: 'c', php: 'c',
-            ut: 'html', htm: 'html', html: 'html', xml: 'html',
-            sh: 'shell', bash: 'shell', zsh: 'shell', awk: 'shell',
-            lua: 'lua', py: 'python', yaml: 'yaml', yml: 'yaml',
-            conf: 'ini', ini: 'ini', cfg: 'ini', toml: 'ini'
-        };
-        return map[ext] ? HF.wm_indent_profiles[map[ext]] : null;
-    }
+        return HF.wm_indent_profiles[HF.wm_editor_language(path, first_line).indent] || null;
+    };
 
     HF.wm_indent_unit = function wm_indent_unit(text) {
         var lines = String(text || '').split('\n'), tabs = 0, counts = {};
@@ -834,7 +854,7 @@
             case_box.disabled = !as_text || regex_box.checked;
             if (regex_box.checked) case_box.checked = true;
             else if (!as_text) case_box.checked = false;
-            case_label.title = !as_text ? HF.tr('Only applies to text search') : (regex_box.checked ? HF.tr('Regex search is always case sensitive') : '');
+            case_label.title = !as_text ? HF.tr('Only applies to ASCII text search') : (regex_box.checked ? HF.tr('Regex search is always case sensitive') : '');
             if (options.hex) {
                 ascii_box.disabled = regex_box.checked;
                 regex_box.disabled = !!ascii_box.checked;
@@ -1364,6 +1384,14 @@
             height: 590,
             minWidth: 390,
             minHeight: 270,
+            applyLineNumbers: function(on) {
+                if (text_shell.classList.contains('is-line-numbers-visible') === !!on) return;
+                text_shell.classList.toggle('is-line-numbers-visible', !!on);
+                if (on) {
+                    compute_gutter(session.text);
+                    render_gutter();
+                }
+            },
             applyWrap: function(on) {
                 session.wrap = !!on;
                 editor.classList.toggle('is-wrap', session.wrap);
@@ -1379,6 +1407,7 @@
                 });
             },
             onClose: function() {
+                if (prism) prism.dispose();
                 if (caret_frame) cancelAnimationFrame(caret_frame);
                 if (gutter_timer) clearTimeout(gutter_timer);
                 if (gutter_raf) cancelAnimationFrame(gutter_raf);
@@ -1392,15 +1421,13 @@
             get dirty() { return session.dirty; },
             get readonly() { return session.readonly; }
         }, save, function() { HF.window_manager.close(record); }, function() {
-            var show = text_shell.classList.toggle('is-line-numbers-visible');
-            if (show) {
-                compute_gutter(session.text);
-                render_gutter();
-            }
+            var show = !text_shell.classList.contains('is-line-numbers-visible');
             HF.save_show_line_numbers(show ? 1 : 0);
         });
         content.appendChild(footer.element);
 
+        var prism = HF.bind_prism_highlight ? HF.bind_prism_highlight(editor, item.path || item.name) : null;
+        record.options.applyPrism = function(on) { if (prism) prism.setEnabled(on); };
         var history_buttons = HF.wm_add_history_buttons(record, undo_edit, redo_edit);
         var last_cursor = null;
 
@@ -1654,7 +1681,7 @@
             if (event.key === 'Enter' && !session.readonly) {
                 event.preventDefault(); insert_newline(!event.shiftKey);
             }
-            else if (profile && profile.close && !session.readonly &&
+            else if (HF.state.preferences.editor_auto_indent === 1 && profile && profile.close && !session.readonly &&
                     (event.key === '}' || event.key === ')' || event.key === ']')) {
                 var pos = selection_offset();
                 if (pos !== null) {
@@ -1690,7 +1717,7 @@
         });
 
         function start_load() {
-            tip_text(HF.tr('Reading full file…'));
+            tip_text('');
             HF.wm_read_editor_file(item).then(function(data) {
                 var raw = HF.wm_decode_utf8(data.bytes, true);
                 session.eol = raw.indexOf('\r\n') >= 0 ? '\r\n' : '\n';
@@ -2607,7 +2634,7 @@
         if (resizeObserver) resizeObserver.observe(scroll);
 
         function start_load() {
-            tip_text(HF.tr('Reading current file pages…'));
+            tip_text('');
             session.source.ensure(0, Math.min(total(), 131072)).then(function() {
                 refresh_dirty();
                 paint();
@@ -2733,8 +2760,8 @@
 
         function load(offset) {
             offset = Math.max(0, Math.min(session.total - 1, Number(offset) || 0));
-            tip.textContent = HF.tr('Reading full file…');
-            tip.style.display = 'block';
+            tip.textContent = '';
+            tip.style.display = 'none';
             var fetch_len = HF.CHUNK_SIZE + 4096;
             HF.file_io(item).slice(item.path, offset, fetch_len).then(function (result) {
                 var bytes = new Uint8Array(result.buffer);

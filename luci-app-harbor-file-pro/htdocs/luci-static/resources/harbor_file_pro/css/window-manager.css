@@ -150,7 +150,7 @@ html[data-harbor-file-manager] .fm-window-managed{
     flex: 1 1 auto;
     min-height: 0;
     overflow: auto;
-    overscroll-behavior: contain;
+    overscroll-behavior: auto contain;
     -webkit-overflow-scrolling: touch;
 }
 

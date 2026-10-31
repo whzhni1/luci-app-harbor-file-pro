@@ -396,7 +396,7 @@ msgid "GraphicsMagick is required to generate thumbnails"
 msgstr "生成缩略图需要 GraphicsMagick"
 
 msgid "Group"
-msgstr "分组"
+msgstr "用户组"
 
 msgid "Harbor File is a powerful OpenWrt file management plugin"
 msgstr "Harbor File 是一款功能强大的 OpenWrt 文件管理插件"
@@ -521,8 +521,8 @@ msgstr "大图标"
 msgid "Line"
 msgstr "行"
 
-msgid "Line numbers"
-msgstr "行号"
+msgid "Show line numbers"
+msgstr "行数显示"
 
 msgid "Lines"
 msgstr "行"
@@ -746,9 +746,6 @@ msgstr "只读"
 msgid "Read size"
 msgstr "读取大小"
 
-msgid "Reading full file…"
-msgstr "正在读取完整文件…"
-
 msgid "Reading the archive contents"
 msgstr "正在读取压缩包内容"
 
@@ -776,8 +773,8 @@ msgstr "重做"
 msgid "Refresh"
 msgstr "刷新"
 
-msgid "Only applies to text search"
-msgstr "按 ASCII 搜索时才生效"
+msgid "Only applies to ASCII text search"
+msgstr "按 ASCII 文本搜索时才生效"
 
 msgid "Regex search is always case sensitive"
 msgstr "正则搜索始终按大小写精确匹配"
@@ -1259,7 +1256,7 @@ msgid "Cannot allocate a unique name"
 msgstr "无法分配唯一的名称"
 
 msgid "Cannot transfer a directory into itself"
-msgstr "不能把目录移动到它自身内部"
+msgstr "不能将目录复制或移动到其自身内部"
 
 msgid "Copy failed"
 msgstr "复制失败"
@@ -1267,8 +1264,8 @@ msgstr "复制失败"
 msgid "Move failed"
 msgstr "移动失败"
 
-msgid "Move succeeded but source could not be removed"
-msgstr "移动成功但无法删除源文件"
+msgid "Content copied, but source removal failed; move incomplete"
+msgstr "内容已复制，但源内容删除失败，移动未完成"
 
 msgid "Not a directory"
 msgstr "不是目录"
@@ -1321,7 +1318,7 @@ msgstr "上级目录"
 msgid "Empty directory"
 msgstr "空目录"
 
-msgid "No folder"
+msgid "Ungrouped"
 msgstr "未分组"
 
 msgid "Rename folder"
@@ -1372,7 +1369,7 @@ msgstr "有可用更新"
 msgid "Version check failed"
 msgstr "版本检查失败"
 
-msgid "Mirror"
+msgid "Update source"
 msgstr "更新源"
 
 msgid "Auto"
@@ -1474,7 +1471,7 @@ msgstr "远程设备"
 msgid "Copy this item to the local device to use this operation"
 msgstr "请先复制到本机，再使用此操作"
 
-msgid "Not available"
+msgid "Not retrieved"
 msgstr "未获取"
 
 msgid "Transfer"
@@ -1489,8 +1486,8 @@ msgstr "耗时"
 msgid "Transfer failed; some files may have been copied"
 msgstr "传输失败，部分文件可能已复制"
 
-msgid "Confirm SSH host key"
-msgstr "确认 SSH 主机指纹"
+msgid "Confirm SSH host key fingerprint"
+msgstr "确认 SSH 主机密钥指纹"
 
 msgid "Verify this fingerprint with the device before trusting it"
 msgstr "请与目标设备核对指纹，确认一致后再信任"
@@ -1549,8 +1546,8 @@ msgstr "设备不存在"
 msgid "Invalid device name"
 msgstr "无效的设备名称"
 
-msgid "Invalid host"
-msgstr "无效的 IP/域名"
+msgid "Invalid IP address or domain name"
+msgstr "无效的 IP 地址或域名"
 
 msgid "Invalid username"
 msgstr "无效的用户名"
@@ -1558,8 +1555,8 @@ msgstr "无效的用户名"
 msgid "Invalid port"
 msgstr "无效的端口"
 
-msgid "Invalid password"
-msgstr "密码无效，不能为空或全空白，也不能包含换行或空字符"
+msgid "Invalid password: use 1–1024 bytes, not only whitespace, with no line breaks or NUL characters"
+msgstr "密码无效：长度须为 1–1024 字节，不能全为空白，也不能包含换行或空字符"
 
 msgid "Cannot save device"
 msgstr "无法保存设备"
@@ -1612,8 +1609,8 @@ msgstr "无效的冲突处理方式"
 msgid "Invalid excluded path"
 msgstr "无效的排除路径"
 
-msgid "Too many selected paths"
-msgstr "选择的路径过多，请分批复制"
+msgid "Too many selected paths; transfer them in smaller batches"
+msgstr "选择的路径过多，请分批传输"
 
 msgid "Cannot create transfer task"
 msgstr "无法创建传输任务"
@@ -1646,7 +1643,7 @@ msgid "Host key was already confirmed; reconnect"
 msgstr "主机密钥已确认，请重新连接"
 
 msgid "Device settings changed; reopen the device"
-msgstr "设备连接配置已变更，请重新打开设备并复制"
+msgstr "设备连接配置已变更，请重新打开设备"
 
 msgid "e.g. Living room router"
 msgstr "例如：客厅路由器"
@@ -1708,7 +1705,7 @@ msgstr "stat 已可用，无需重复安装"
 msgid "Installation failed; check the remote device before retrying"
 msgstr "安装失败，请先检查远端设备再重试"
 
-msgid "This tar cannot safely exclude paths containing line breaks"
+msgid "This tar cannot safely exclude paths containing line breaks; change the selection or use tar with long-option support"
 msgstr "此 tar 不支持安全排除含换行的路径，请调整选择或使用支持长选项的 tar"
 
 msgid "Destination device"
@@ -1763,9 +1760,6 @@ msgstr "浏览器必须能够访问该远端设备的 ttyd 端口。这不是 SS
 msgid "Install ttyd on this remote device? Its package scripts may start a web terminal service. Review the device’s authentication and network access settings."
 msgstr "向该远端设备安装 ttyd？软件包脚本可能启动网页终端服务，请检查该设备的认证和网络访问设置。"
 
-msgid "Reading current file pages…"
-msgstr "正在读取当前文件分页…"
-
 msgid "Glass appearance"
 msgstr "磨砂外观"
 
@@ -1790,9 +1784,6 @@ msgstr "重置当前"
 msgid "Reset all appearance"
 msgstr "重置全部外观"
 
-msgid "Changes are previewed only. Save to keep them."
-msgstr "当前仅预览效果，点击保存后才会写入配置。"
-
 msgid "Save appearance failed"
 msgstr "外观保存失败"
 
@@ -1805,5 +1796,142 @@ msgstr "保存失败，已保留当前调节，可重试或取消。"
 msgid "Move panel with arrow keys"
 msgstr "使用方向键移动面板"
 
-msgid "Drag to scroll; Shift-drag to select text"
+msgid "Drag to scroll horizontally; Shift-drag to select text"
 msgstr "拖动可横向浏览；按住 Shift 拖动可选择文字"
+
+msgid "Editor settings"
+msgstr "编辑设置"
+
+msgid "Prism code highlighting"
+msgstr "Prism 代码高亮"
+
+msgid "Highlight code while editing. Highlighting is automatically disabled for unsupported browsers and large files."
+msgstr "为编辑代码着色高亮，不支持的浏览器及大文件自动禁用高亮"
+
+msgid "Save editor settings failed"
+msgstr "保存编辑设置失败"
+
+msgid "Invalid editor setting"
+msgstr "编辑设置无效"
+
+msgid "This browser uses plain text because range highlighting is unavailable."
+msgstr "此浏览器不支持文本范围高亮，编辑器使用纯文本。"
+
+msgid "Another update is running. Please retry later."
+msgstr "已有更新任务正在运行，请稍后重试。"
+
+msgid "Invalid Prism update version"
+msgstr "Prism 更新版本无效"
+
+msgid "Invalid update component"
+msgstr "更新组件无效"
+
+msgid "Download update resources using curl."
+msgstr "通过 curl 下载 更新 资源。"
+
+msgid "Missing Prism update tools: %s"
+msgstr "Prism 更新缺少工具：%s"
+
+
+msgid "Reinstall"
+msgstr "重新安装"
+
+
+msgid "Invalid update source"
+msgstr "无效的更新源"
+
+msgid "Show line numbers when editing text or code."
+msgstr "编辑文本或代码时显示行数"
+
+msgid "Invalid transfer operation"
+msgstr "无效的传输操作"
+
+msgid "Source directory cannot be moved"
+msgstr "无法移动源目录"
+
+msgid "Cannot identify transfer endpoints safely"
+msgstr "无法安全识别传输两端"
+
+msgid "Source and destination overlap; move refused"
+msgstr "源路径与目标路径重叠，已拒绝移动"
+
+msgid "Cannot prepare verification"
+msgstr "无法准备校验"
+
+msgid "Remote file access denied"
+msgstr "远端文件访问被拒绝"
+
+msgid "Cannot read remote file helper sources"
+msgstr "无法读取远端文件辅助程序源码"
+
+msgid "Cannot prepare remote helper sources"
+msgstr "无法准备远端辅助程序源码"
+
+msgid "Cannot identify remote helper"
+msgstr "无法识别远端辅助程序"
+
+msgid "Remote file tools are missing"
+msgstr "缺少远端文件操作工具"
+
+msgid "Cannot start remote helper setup"
+msgstr "无法开始部署远端辅助程序"
+
+msgid "Remote file helper is not ready; reopen the operation"
+msgstr "远端文件辅助程序尚未就绪，请重新打开操作"
+
+msgid "Unsupported remote file action"
+msgstr "不支持的远端文件操作"
+
+msgid "Unsupported remote file mode"
+msgstr "不支持的远端文件操作模式"
+
+msgid "Remote request is too large"
+msgstr "远端请求过大"
+
+msgid "Invalid remote file request"
+msgstr "无效的远端文件请求"
+
+msgid "Unsupported remote tool"
+msgstr "不支持的远端工具"
+
+msgid "Cannot prepare remote request"
+msgstr "无法准备远端请求"
+
+msgid "Invalid remote file response"
+msgstr "无效的远端文件响应"
+
+msgid "Invalid remote upload"
+msgstr "无效的远端上传"
+
+msgid "Cannot start remote file request"
+msgstr "无法发起远端文件请求"
+
+msgid "Invalid remote file headers"
+msgstr "无效的远端文件响应头"
+
+msgid "Cannot create runtime directory"
+msgstr "无法创建运行时目录"
+
+msgid "Cannot start update task"
+msgstr "无法启动更新任务"
+
+msgid "Cannot prepare update directory"
+msgstr "无法准备更新目录"
+
+msgid "Cannot write update files"
+msgstr "无法写入更新文件"
+
+msgid "Cannot create thumbnail script"
+msgstr "无法创建缩略图脚本"
+
+msgid "File and directory types conflict"
+msgstr "文件与目录类型冲突"
+
+msgid "Invalid device"
+msgstr "无效的设备"
+
+msgid "Invalid upload directory"
+msgstr "无效的上传目录"
+
+msgid "Invalid directory path"
+msgstr "无效的目录路径"

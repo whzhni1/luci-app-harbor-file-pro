@@ -73,10 +73,10 @@ function update_device(p) {
 		if (substr(d.host, 0, 1) == '[' && substr(d.host, -1) == ']') d.host = substr(d.host, 1, length(d.host) - 2);
 	}
 	if (type(d.name) != 'string' || !length(trim(d.name)) || length(d.name) > 128) error('Invalid device name');
-	if (type(d.host) != 'string' || !match(d.host, /^[A-Za-z0-9:][A-Za-z0-9.:%_-]*$/) || length(d.host) > 253) error('Invalid host');
+	if (type(d.host) != 'string' || !match(d.host, /^[A-Za-z0-9:][A-Za-z0-9.:%_-]*$/) || length(d.host) > 253) error('Invalid IP address or domain name');
 	if (type(d.username) != 'string' || !match(d.username, /^[A-Za-z0-9_][A-Za-z0-9_.-]*$/) || length(d.username) > 64) error('Invalid username');
 	if (!match('' + d.port, /^[0-9]+$/) || +d.port < 1 || +d.port > 65535) error('Invalid port');
-	if (type(d.password) != 'string' || !length(trim(d.password)) || length(d.password) > 1024 || (index(d.password, '\x00') >= 0 || index(d.password, '\r') >= 0 || index(d.password, '\n') >= 0)) error('Invalid password');
+	if (type(d.password) != 'string' || !length(trim(d.password)) || length(d.password) > 1024 || (index(d.password, '\x00') >= 0 || index(d.password, '\r') >= 0 || index(d.password, '\n') >= 0)) error('Invalid password: use 1–1024 bytes, not only whitespace, with no line breaks or NUL characters');
 	H.read_preferences();
 	fs.chmod('/etc/config/harbor_file_pro', 0o600);
 	let old = p.id ? device(p.id) : null;
@@ -165,7 +165,7 @@ function trusted(d) {
 	for (let i = 0; i < 64; i += 2) fingerprint += chr(int(substr(digest, i, 2), 16));
 	let challenge = token();
 	save_json(ROOT + '/trust-' + challenge, { id: d.id, host: d.host, port: d.port, key, expires: time() + 300 });
-	error('Confirm SSH host key', { challenge, device_id: d.id, name: d.name, host: d.host, port: d.port, fingerprint: 'SHA256:' + replace(b64enc(fingerprint), '=', '') });
+	error('Confirm SSH host key fingerprint', { challenge, device_id: d.id, name: d.name, host: d.host, port: d.port, fingerprint: 'SHA256:' + replace(b64enc(fingerprint), '=', '') });
 }
 function run(d, script) {
 	trusted(d);
@@ -177,7 +177,7 @@ function run(d, script) {
 }
 const STAT_DETECT = "stat_kind=missing\nif command -v stat >/dev/null 2>&1 && stat -c '%s %Y %a' / >/dev/null 2>&1; then\n stat_kind=command\nelif busybox stat -c '%s %Y %a' / >/dev/null 2>&1; then\n stat_kind=busybox\nfi\n";
 const STAT_SUPPORT = STAT_DETECT + "case \"$stat_kind\" in\n busybox) stat() { busybox stat \"$@\"; };;\n missing) printf '%s\\n' 'stat is required on this device; install coreutils-stat on this device and reconnect' >&2; exit 127;;\nesac\n";
-const LIST_SCRIPT = 'set -e\np=$1\ncd -P "$p"\nprintf "%s\\0" "$PWD"\ndf -Pk . | tail -n 1\nprintf "\\0"\n[ "$2" != capacity ] || exit 0\n' + STAT_SUPPORT + 'for f in ./* ./.[!.]* ./..?*; do\n [ -e "$f" ] || [ -L "$f" ] || continue\n k=file\n if [ -L "$f" ]; then k=symlink; [ ! -d "$f" ] || k=directory_link; elif [ -d "$f" ]; then k=directory; elif [ ! -f "$f" ]; then k=special; fi\n printf "%s\\0%s\\0" "${f#./}" "$k"\n stat -c "%s %Y %a" "$f"\n printf "\\0"\n if [ -L "$f" ]; then readlink -n "$f"; fi\n printf "\\0"\ndone';
+const LIST_SCRIPT = 'set -e\np=$1\ncd -P "$p"\nprintf "%s\\0" "$PWD"\ndf -Pk . | tail -n 1\nif command -v pv >/dev/null 2>&1; then printf "HF_PV=1\\n"; fi\nprintf "\\0"\n[ "$2" != capacity ] || exit 0\n' + STAT_SUPPORT + 'for f in ./* ./.[!.]* ./..?*; do\n [ -e "$f" ] || [ -L "$f" ] || continue\n k=file\n if [ -L "$f" ]; then k=symlink; [ ! -d "$f" ] || k=directory_link; elif [ -d "$f" ]; then k=directory; elif [ ! -f "$f" ]; then k=special; fi\n printf "%s\\0%s\\0" "${f#./}" "$k"\n stat -c "%s %Y %a" "$f"\n printf "\\0"\n if [ -L "$f" ]; then readlink -n "$f"; fi\n printf "\\0"\ndone';
 function listing(d, path, capacity) {
 	path = path_value(path);
 	let raw;
@@ -201,7 +201,7 @@ function listing(d, path, capacity) {
 			preview: 'none', ext: H.file_extension(name), hidden: substr(name, 0, 1) == '.' });
 	}
 	H.sort_directory_items(items);
-	return { path, physical, parent: H.parent_path(path), items, available_bytes: (+space[3] || 0) * 1024,
+	return { path, physical, transfer_meter: index(fields[1], '\nHF_PV=1') >= 0, parent: H.parent_path(path), items, available_bytes: (+space[3] || 0) * 1024,
 		total_bytes: (+space[1] || 0) * 1024, used_bytes: (+space[2] || 0) * 1024,
 		operation_space_margin: 16777216, has_operation_space: (+space[3] || 0) * 1024 >= 16777216 };
 }
@@ -226,7 +226,8 @@ function plan(p) {
 		if (path == '/' || H.parent_path(path) != parent || selected_paths[path]) error('Select files from one directory');
 		selected_paths[path] = true;
 	}
-	let src = listing(source, parent), dst = listing(target, dest), items = [], conflicts = [], names = {}, suggestions = {};
+	let direct = source && target && source.id == target.id && source.revision == target.revision;
+	let src = listing(source, parent), dst = direct && parent == dest ? src : listing(target, dest), items = [], conflicts = [], names = {}, suggestions = {};
 	if (!dst.has_operation_space) error('Not enough free space');
 	if (!H.read_preferences().allow_system_operations && (H.is_system_path(dest) || H.is_system_path(dst.physical))) error('System folder operations are disabled');
 	let renames = {};
@@ -263,7 +264,7 @@ function plan(p) {
 		item.target_name = name;
 		push(items, item);
 	}
-	return { source, target, parent, dest, items, conflicts, rename_names: suggestions, physical_source: src.physical, physical_target: dst.physical };
+	return { source, target, parent, dest, items, conflicts, rename_names: suggestions, physical_source: src.physical, physical_target: dst.physical, direct: direct && src.transfer_meter };
 }
 function exclude_pattern(path) {
 	let out = '';
@@ -335,6 +336,9 @@ function launch_task(dir, script, task) {
 	save_json(dir + '/state', task);
 	return task;
 }
+function transfer_pipeline(source, target, meter_output) {
+	return '{ ' + source + '; echo $? > source.rc; } | { pv -f -n -b -t -i 1 ' + meter_output + '; echo $? > meter.rc; } | { ' + target + '; echo $? > target.rc; }\nfor f in source.rc meter.rc target.rc; do [ "$(cat "$f" 2>/dev/null)" = 0 ] || exit 1; done\n';
+}
 function start(p) {
 	if (!H.command_exists('pv')) error('pv is not installed');
 	let q = plan(p);
@@ -363,7 +367,7 @@ function start(p) {
 	let create = 'tar -cf -';
 	let preflight = '';
 	if (line_exclusion) {
-		preflight = 'tar --exclude=harbor-capability-check -cf /dev/null -C /proc version 2>/dev/null || { printf "%s\\n" ' + quote(H.tr('This tar cannot safely exclude paths containing line breaks')) + ' >&2; exit 1; }\n';
+		preflight = 'tar --exclude=harbor-capability-check -cf /dev/null -C /proc version 2>/dev/null || { printf "%s\\n" ' + quote(H.tr('This tar cannot safely exclude paths containing line breaks; change the selection or use tar with long-option support')) + ' >&2; exit 1; }\n';
 		for (let pattern in patterns) create += ' --exclude=' + quote(pattern);
 		create += ' ' + selection;
 	}
@@ -379,22 +383,29 @@ function start(p) {
 		if (action != 'overwrite') target_script += '[ ! -e ' + quote(target_path) + ' ] && [ ! -L ' + quote(target_path) + ' ] || { echo "Target already exists" >&2; exit 1; }\n';
 		target_script += 'merge "$stage/data"/' + quote(item.name) + ' ' + quote(target_path) + '\n';
 	}
-	if (length(source_script) + length(target_script) > 60000) error('Too many selected paths');
+	if (length(source_script) + length(target_script) > 60000) error('Too many selected paths; transfer them in smaller batches');
 	private_dir(dir + '/source'); private_dir(dir + '/target');
-	let source_command = ssh_command(q.source, dir + '/source', source_script, false);
-	let target_command = ssh_command(q.target, dir + '/target', target_script, false);
+	let transfer;
+	if (q.direct) {
+		let work = '/tmp/harbor_file_pro/transfer-' + id;
+		let direct_script = 'set -e\numask 077\nroot=/tmp/harbor_file_pro\n[ ! -L "$root" ] || exit 1\nif [ -e "$root" ]; then [ -d "$root" ] && [ -O "$root" ] || exit 1; else mkdir -m 700 "$root"; fi\nwork=' + quote(work) + '\nmkdir -m 700 "$work"\ntrap \'rm -rf "$work"\' EXIT HUP INT TERM\ncd "$work"\nset +e\n' + transfer_pipeline('sh -c ' + quote(source_script), 'sh -c ' + quote(target_script), '2>&3');
+		transfer = ssh_command(q.source, dir + '/source', 'exec 3>&1\n' + direct_script, false) + ' >progress || finish 1\n';
+	}
+	else {
+		let source_command = ssh_command(q.source, dir + '/source', source_script, false);
+		let target_command = ssh_command(q.target, dir + '/target', target_script, false);
+		transfer = '(\n' + transfer_pipeline(source_command, target_command, '2>progress') + ') || finish 1\n';
+	}
 	let move = null;
 	try { if (p.operation == 'move') move = move_commands(q, excluded, dir); }
 	catch (e) { cleanup(dir + '/source'); cleanup(dir + '/target'); die(e); }
 	let script = 'umask 077\ncd ' + quote(dir) + '\ntrap \'rm -f source/password target/password\' EXIT HUP INT TERM\n' +
 		'finish() { printf "%s\\n" "$1" > result.tmp; mv result.tmp result; exit "$1"; }\n';
 	if (move) script += 'trap \'rm -f source/password target/password source.before source.after target.after delete.list verify.uc\' EXIT HUP INT TERM\necho hashing > phase\n(ulimit -f 8192 && ' + move.source + ' > source.before) || finish 1\nucode verify.uc ' + quote(dir) + ' prepare || finish 1\n';
-	script += 'echo copying > phase\n' +
-		'{ ' + source_command + '; echo $? > source.rc; } | { pv -f -n -b -t -i 1 2>progress; echo $? > meter.rc; } | { ' + target_command + '; echo $? > target.rc; }\n' +
-		'for f in source.rc meter.rc target.rc; do [ "$(cat "$f" 2>/dev/null)" = 0 ] || finish 1; done\n';
+	script += 'echo copying > phase\n' + transfer;
 	if (move) script += 'echo verifying > phase\n(ulimit -f 8192 && ' + move.source + ' > source.after) || finish 1\n(ulimit -f 8192 && ' + move.target + ' < source.before > target.after) || finish 1\nucode verify.uc ' + quote(dir) + ' || finish 1\necho deleting > phase\n' + move.remove + ' < delete.list > delete.log || finish 1\n';
 	script += 'echo complete > phase\nfinish 0\n';
-	return launch_task(dir, script, { task_id: id, path_encoding: 'hex', operation: move ? 'move' : 'copy', source_items: move ? map(q.items, (item) => ({ path: item.path, name: item.name })) : null, started: time(), source_device: p.source_device ?? '', target_device: p.target_device ?? '', target_dir: q.dest, done: false });
+	return launch_task(dir, script, { task_id: id, transport: q.direct ? 'remote-local' : 'relay', path_encoding: 'hex', operation: move ? 'move' : 'copy', source_items: move ? map(q.items, (item) => ({ path: item.path, name: item.name })) : null, started: time(), source_device: p.source_device ?? '', target_device: p.target_device ?? '', target_dir: q.dest, done: false });
 }
 const REMOTE_STAT_INSTALL = "set -e\n" + STAT_DETECT + "[ \"$stat_kind\" = missing ] || { echo 'stat is already available'; exit 0; }\n[ \"$(id -u)\" = 0 ] || { echo 'Remote installation requires a root SSH account' >&2; exit 1; }\nroot=/tmp/harbor_file_pro\n[ ! -L \"$root\" ] || exit 1\nif [ -e \"$root\" ]; then [ -d \"$root\" ] && [ -O \"$root\" ] || exit 1; else mkdir -m 700 \"$root\"; fi\nchmod 700 \"$root\"\nlock=\"$root/stat-install.lock\"\nmkdir -m 700 \"$lock\" || { echo 'Another stat installation is running; check the remote device' >&2; exit 1; }\ntrap 'rmdir \"$lock\"' EXIT HUP INT TERM\nif command -v apk >/dev/null 2>&1; then\n apk update\n apk add coreutils-stat\nelif command -v opkg >/dev/null 2>&1; then\n opkg update\n opkg install coreutils-stat\nelse\n echo 'Remote device has neither opkg nor apk' >&2\n exit 1\nfi\n" + STAT_SUPPORT + "stat -c '%s %Y %a' / >/dev/null\necho 'stat is available'\n";
 
@@ -469,7 +480,6 @@ function agent_install(p) {
 }
 function agent_prepare(p) {
  let d = agent_device(p);
- if (!agent_info(p).ready) error('Remote file tools are missing', { agent_missing: true, device_id: d.id, device_revision: d.revision });
  let api = H.api_source ? H.api_source() : null;
  let io = require('harborpro.io').agent_source();
  if (!length(api) || !length(io) || index(api, 'function read_preferences() {') < 0 || index(io, 'function agent(') < 0) error('Cannot read remote file helper sources');
@@ -478,15 +488,17 @@ function agent_prepare(p) {
  api = replace(api, "const RUNTIME_DIR = '/tmp/harbor_file_pro';", "const RUNTIME_DIR = '" + agent_root() + "/runtime';", 1);
  io = replace(io, "const RUNTIME_DIR = '/tmp/harbor_file_pro';", "const RUNTIME_DIR = '" + agent_root() + "/runtime';", 1);
  let codes = { 'agent_api.uc': api, 'agent_io.uc': io, 'agent_context.uc': AGENT_CONTEXT };
- let dir = workspace();
+ let dir = workspace(), hash;
  let combined = join('\n', map(keys(codes), (key) => codes[key]));
  try {
   if (fs.writefile(dir + '/source', combined) != length(combined) || !fs.chmod(dir + '/source', 0o600)) error('Cannot prepare remote helper sources');
-  let hash = split(trim(shell('sha256sum < ' + quote(dir + '/source'), dir, 5)), ' ')[0];
+  hash = split(trim(shell('sha256sum < ' + quote(dir + '/source'), dir, 5)), ' ')[0];
   fs.unlink(dir + '/source');
   if (!match(hash, /^[a-f0-9]{64}$/)) error('Cannot identify remote helper');
   let path = agent_root() + '/' + hash;
-  let probe = trim(run(d, '[ ! -L ' + quote(path) + ' ] && [ -O ' + quote(path + '/ready') + ' ] && cat ' + quote(path + '/ready') + ' || true'));
+  let probe = trim(run(d, STAT_DETECT + 'if [ "$stat_kind" = missing ]; then echo HF_STAT_MISSING; elif [ "$(' + AGENT_TOOLS + ')" != ok ]; then echo HF_AGENT_MISSING; else [ ! -L ' + quote(path) + ' ] && [ -O ' + quote(path + '/ready') + ' ] && cat ' + quote(path + '/ready') + ' || true; fi'));
+  if (probe == 'HF_STAT_MISSING') error('coreutils-stat is required to open this device', { stat_missing: true, device_id: d.id, device_revision: d.revision });
+  if (probe == 'HF_AGENT_MISSING') error('Remote file tools are missing', { agent_missing: true, device_id: d.id, device_revision: d.revision });
   if (probe != hash) {
    let stage = agent_root() + '/.' + token();
    let deploy = agent_setup_script() + 'stage=' + quote(stage) + '\nmkdir -m 700 "$stage"\ntrap \'rm -rf "$stage"\' EXIT HUP INT TERM\n';
@@ -504,13 +516,13 @@ function agent_prepare(p) {
  }
  catch (e) { fs.unlink(dir + '/source'); fs.unlink(dir + '/deploy.log'); remove_query(dir); die(e); }
  fs.unlink(dir + '/deploy.log'); remove_query(dir);
- return { ready: true, device_id: d.id, device_revision: d.revision };
+ return { ready: true, device_id: d.id, device_revision: d.revision, helper_hash: hash };
 }
 function agent_request(p, params, api, env) {
  let d = agent_device(p);
  trusted(d);
  let cached = read_json(ROOT + '/agent-' + d.id);
- if (!cached || cached.revision != d.revision || !match(cached.hash ?? '', /^[a-f0-9]{64}$/) || cached.path != agent_root() + '/' + cached.hash) error('Remote file helper is not ready; reopen the operation');
+ if (!cached || cached.revision != d.revision || !match(cached.hash ?? '', /^[a-f0-9]{64}$/) || cached.path != agent_root() + '/' + cached.hash) error('Remote file helper is not ready; reopen the operation', { helper_missing: true });
  if (api && index(AGENT_APIS, api) < 0) error('Unsupported remote file action');
  if (!api && index(AGENT_MODES, params.mode ?? 'download') < 0) error('Unsupported remote file mode');
  let prefs = H.read_preferences();
@@ -525,7 +537,8 @@ function agent_request(p, params, api, env) {
  let input = sprintf('%J', request) + '\n';
  if (length(input) > 4194304) error('Remote request is too large');
  let program = 'const req = json(require("fs").stdin.read("line")); req.preferences.home_dir = getenv("HOME") || "/tmp"; if (req.api) { require("agent_context").request = req; require("agent_api")["api_" + req.api](); } else require("agent_io").agent(req.params, req.env, req.preferences);';
- let script = '[ ! -L ' + quote(cached.path) + ' ] && [ -O ' + quote(cached.path + '/ready') + ' ] && [ "$(cat ' + quote(cached.path + '/ready') + ')" = ' + quote(cached.hash) + ' ] || { echo "Remote file helper is not ready; reopen the operation" >&2; exit 1; }\nexec ucode -L ' + quote(cached.path) + ' -e ' + quote(program);
+ let missing = api ? 'printf %s ' + quote(sprintf('%J', { code: 1, message: 'Remote file helper is not ready; reopen the operation', data: { helper_missing: true } })) + '; exit 0;' : 'echo "Remote file helper is not ready; reopen the operation" >&2; exit 1;';
+ let script = '[ ! -L ' + quote(cached.path) + ' ] && [ -O ' + quote(cached.path + '/ready') + ' ] && [ "$(cat ' + quote(cached.path + '/ready') + ')" = ' + quote(cached.hash) + ' ] || { ' + missing + ' }\nexec ucode -L ' + quote(cached.path) + ' -e ' + quote(program);
  return { device: d, script, input };
 }
 function agent_rpc(p) {
@@ -538,7 +551,14 @@ function agent_rpc(p) {
   if (!info.root) error('Remote installation requires a root SSH account');
   if (!info.can_install) error('Remote device has neither opkg nor apk');
  }
- let job = agent_request(p, data, p.rpc_action, { REQUEST_METHOD: 'POST', CONTENT_LENGTH: '0' });
+ let job;
+ try { job = agent_request(p, data, p.rpc_action, { REQUEST_METHOD: 'POST', CONTENT_LENGTH: '0' }); }
+ catch (e) {
+  let detail;
+  try { detail = json('' + e); } catch (ignored) {}
+  if (detail?.data?.helper_missing) return { code: 1, message: detail.message, data: detail.data };
+  die(e);
+ }
  let dir = workspace(), raw, response;
  try {
   if (fs.writefile(dir + '/request', job.input) != length(job.input) || !fs.chmod(dir + '/request', 0o600)) error('Cannot prepare remote request');

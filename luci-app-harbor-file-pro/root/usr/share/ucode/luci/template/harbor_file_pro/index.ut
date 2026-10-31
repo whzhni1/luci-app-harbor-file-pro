@@ -23,6 +23,7 @@ window.HarborFile = {
         this.sessionid = config.sessionid;
         this.labels = config.labels;
         this.resource = config.resource;
+        this.asset_version = config.asset_version;
         return this;
     }
 };
@@ -110,12 +111,12 @@ HarborFile.init({
         remote_install_uncertain: '{{ _('Installation status is uncertain. Check the remote device before starting another installation.') }}',
         remote_devices: '{{ _('Remote devices') }}',
         remote_unavailable: '{{ _('Copy this item to the local device to use this operation') }}',
-        remote_unknown: '{{ _('Not available') }}',
+        remote_unknown: '{{ _('Not retrieved') }}',
         remote_transfer: '{{ _('Transfer') }}',
         remote_transferred: '{{ _('Transferred') }}',
         remote_elapsed: '{{ _('Elapsed') }}',
         remote_failed: '{{ _('Transfer failed; some files may have been copied') }}',
-        remote_host_key: '{{ _('Confirm SSH host key') }}',
+        remote_host_key: '{{ _('Confirm SSH host key fingerprint') }}',
         remote_verify: '{{ _('Verify this fingerprint with the device before trusting it') }}',
         remote_add: '{{ _('Add device') }}',
         remote_edit: '{{ _('Edit device') }}',
@@ -160,7 +161,21 @@ HarborFile.init({
         move_up: '{{ _('Move up') }}',
         move_down: '{{ _('Move down') }}',
         remove_bookmark: '{{ _('Remove bookmark') }}',
-        no_folder: '{{ _('No folder') }}',
+        no_folder: '{{ _('Ungrouped') }}',
+        editor_settings: '{{ _('Editor settings') }}',
+        download_update_resources_using_curl: '{{ _('Download update resources using curl.') }}',
+        missing_prism_update_tools_s: '{{ _('Missing Prism update tools: %s') }}',
+        no_supported_package_manager_found: '{{ _('No supported package manager found') }}',
+        reinstall: '{{ _('Reinstall') }}',
+        invalid_update_source: '{{ _('Invalid update source') }}',
+        prism_code_highlighting: '{{ _('Prism code highlighting') }}',
+        highlight_code_while_editing_highlighting_is_automatically_disabled_for_unsupported_browsers_and_large_files: '{{ _('Highlight code while editing. Highlighting is automatically disabled for unsupported browsers and large files.') }}',
+        save_editor_settings_failed: '{{ _('Save editor settings failed') }}',
+        invalid_editor_setting: '{{ _('Invalid editor setting') }}',
+        this_browser_uses_plain_text_because_range_highlighting_is_unavailable: '{{ _('This browser uses plain text because range highlighting is unavailable.') }}',
+        another_update_is_running_please_retry_later: '{{ _('Another update is running. Please retry later.') }}',
+        invalid_prism_update_version: '{{ _('Invalid Prism update version') }}',
+        invalid_update_component: '{{ _('Invalid update component') }}',
         current_version: '{{ _('Current version') }}',
         latest_version: '{{ _('Latest version') }}',
         open_with: '{{ _('Open with') }}',
@@ -186,7 +201,7 @@ HarborFile.init({
         up_to_date: '{{ _('Already up to date') }}',
         update_available: '{{ _('Update available') }}',
         update_check_failed: '{{ _('Version check failed') }}',
-        mirror: '{{ _('Mirror') }}',
+        mirror: '{{ _('Update source') }}',
         automatic: '{{ _('Auto') }}',
         downloading_update: '{{ _('Downloading package') }}',
         downloading_lang: '{{ _('Downloading language pack') }}',
@@ -275,7 +290,7 @@ HarborFile.init({
         restore_last_directory_desc: '{{ _('Reopen the last visited directory when Harbor File starts.') }}',
         undo: '{{ _('Undo') }}',
         redo: '{{ _('Redo') }}',
-        line_numbers: '{{ _('Line numbers') }}',
+        line_numbers: '{{ _('Show line numbers') }}',
         recover_unsaved: '{{ _('Unsaved changes from your last session were found for this file.') }}',
         recover: '{{ _('Recover') }}',
         discard_changes: '{{ _('Discard changes') }}',
@@ -370,12 +385,11 @@ HarborFile.init({
         reset_current: '{{ _('Reset current') }}',
         reset_all_appearance: '{{ _('Reset all appearance') }}',
         cancel: '{{ _('Cancel') }}',
-        changes_are_previewed_only_save_to_keep_them: '{{ _('Changes are previewed only. Save to keep them.') }}',
         save_appearance_failed: '{{ _('Save appearance failed') }}',
         invalid_appearance_value: '{{ _('Invalid appearance value') }}',
         save_failed_your_draft_is_kept_retry_or_cancel: '{{ _('Save failed. Your draft is kept; retry or cancel.') }}',
         move_panel_with_arrow_keys: '{{ _('Move panel with arrow keys') }}',
-        drag_to_scroll_shift_drag_to_select_text: '{{ _('Drag to scroll; Shift-drag to select text') }}',
+        drag_to_scroll_horizontally_shift_drag_to_select_text: '{{ _('Drag to scroll horizontally; Shift-drag to select text') }}',
         settings_saved: '{{ _('Settings saved') }}',
         checking: '{{ _('Checking') }}',
         installed: '{{ _('Installed') }}',
@@ -453,12 +467,11 @@ HarborFile.init({
         search: '{{ _('Search') }}',
         search_text: '{{ _('Search text') }}',
         match_case: '{{ _('Match case') }}',
+        only_applies_to_ascii_text_search: '{{ _('Only applies to ASCII text search') }}',
         replace_with: '{{ _('Replace with') }}',
         replace_all: '{{ _('Replace all') }}',
         regular_expression: '{{ _('Regular expression') }}',
         replace: '{{ _('Replace') }}',
-        reading_current_file_pages: '{{ _('Reading current file pages…') }}',
-        reading_full_file: '{{ _('Reading full file…') }}',
         hex_search_placeholder: '{{ _('Enter hex bytes, e.g. DE AD BE EF') }}',
         hex_replace_placeholder: '{{ _('Replace hex value') }}',
         hex_replace_length_mismatch: '{{ _('Hex replacement must match the match length') }}',
@@ -473,6 +486,7 @@ HarborFile.init({
         task_status_retry: '{{ _('Reading the task status failed, retrying (attempt %d)') }}',
         task_status_unknown: '{{ _('Task result could not be confirmed') }}'
     },
+    asset_version: '{{ harbor_asset_version }}',
     resource: '{{ resource }}/harbor_file_pro/'
 });
 
@@ -522,6 +536,7 @@ window.HarborFile.tr = function (msgid) {
 <script src="{{ harbor_asset_url('js/update.js') }}"></script>
 <script src="{{ harbor_asset_url('js/window-manager.js') }}"></script>
 <script src="{{ harbor_asset_url('js/document-windows.js') }}"></script>
+<script src="{{ harbor_asset_url('js/prism-highlight.js') }}"></script>
 <script src="{{ harbor_asset_url('js/system-windows.js') }}"></script>
 <script src="{{ harbor_asset_url('js/file-operations.js') }}"></script>
 <script src="{{ harbor_asset_url('js/remote.js') }}"></script>
@@ -812,7 +827,7 @@ window.HarborFile.tr = function (msgid) {
                 <span id="fm_about_latest">…</span>
                 <button id="fm_update_start" class="fm-dialog-action primary" type="button" style="display:none">{{ _('Update now') }}</button>
             </div>
-            <div class="fm-about-label">{{ _('Mirror') }}</div>
+            <div class="fm-about-label">{{ _('Update source') }}</div>
             <div class="fm-about-value">
                 <select id="fm_update_mirror" class="fm-form-select fm-update-select">
                     <option value="auto">{{ _('Auto') }}</option>
@@ -865,6 +880,7 @@ window.HarborFile.tr = function (msgid) {
         <div class="fm-settings-shell">
             <div class="fm-settings-menu" role="tablist" aria-label="{{ _('Settings categories') }}">
                 <button id="fm_settings_tab_basic" class="fm-settings-menu-item active" type="button" role="tab" aria-selected="true" aria-controls="fm_settings_panel_basic" data-settings-tab="basic">{{ _('Basic settings') }}</button>
+                <button id="fm_settings_tab_editor" class="fm-settings-menu-item" type="button" role="tab" aria-selected="false" aria-controls="fm_settings_panel_editor" data-settings-tab="editor">{{ _('Editor settings') }}</button>
                 <button id="fm_settings_tab_nginx" class="fm-settings-menu-item" type="button" role="tab" aria-selected="false" aria-controls="fm_settings_panel_nginx" data-settings-tab="nginx">{{ _('Web service') }}</button>
                 <button id="fm_settings_tab_remote" class="fm-settings-menu-item" type="button" role="tab" aria-selected="false" aria-controls="fm_settings_panel_remote" data-settings-tab="remote">{{ _('Remote devices') }}</button>
             </div>
@@ -958,6 +974,24 @@ window.HarborFile.tr = function (msgid) {
                         </div>
                         <div class="fm-settings-row">
                             <div class="fm-settings-copy">
+                                <span class="fm-settings-label">{{ _('Restore last directory') }}</span>
+                                <div class="fm-settings-desc">{{ _('Reopen the last visited directory when Harbor File starts.') }}</div>
+                            </div>
+                            <label class="fm-settings-switch" for="fm_settings_restore_last_directory">
+                                <input id="fm_settings_restore_last_directory" type="checkbox">
+                                <span class="fm-settings-switch-slider"></span>
+                            </label>
+                        </div>
+                    </div>
+                    <div class="fm-settings-page-actions">
+                        <button id="fm_settings_basic_cancel" class="fm-dialog-action" type="button">{{ _('Cancel') }}</button>
+                        <button id="fm_settings_basic_save" class="fm-dialog-action primary" type="button">{{ _('Save') }}</button>
+                    </div>
+                </div>
+                <div id="fm_settings_panel_editor" class="fm-settings-panel" role="tabpanel" aria-labelledby="fm_settings_tab_editor">
+                    <div class="fm-settings-panel-main">
+                        <div class="fm-settings-row">
+                            <div class="fm-settings-copy">
                                 <span class="fm-settings-label">{{ _('Auto indent') }}</span>
                                 <div class="fm-settings-desc">{{ _('Keep the indentation and indent the next line after an opening brace or parenthesis when editing code files.') }}</div>
                             </div>
@@ -978,18 +1012,48 @@ window.HarborFile.tr = function (msgid) {
                         </div>
                         <div class="fm-settings-row">
                             <div class="fm-settings-copy">
-                                <span class="fm-settings-label">{{ _('Restore last directory') }}</span>
-                                <div class="fm-settings-desc">{{ _('Reopen the last visited directory when Harbor File starts.') }}</div>
+                                <label class="fm-settings-label" for="fm_settings_line_numbers">{{ _('Show line numbers') }}</label>
+                                <div class="fm-settings-desc">{{ _('Show line numbers when editing text or code.') }}</div>
                             </div>
-                            <label class="fm-settings-switch" for="fm_settings_restore_last_directory">
-                                <input id="fm_settings_restore_last_directory" type="checkbox">
+                            <label class="fm-settings-switch" for="fm_settings_line_numbers">
+                                <input id="fm_settings_line_numbers" type="checkbox">
                                 <span class="fm-settings-switch-slider"></span>
                             </label>
                         </div>
+                        <div class="fm-settings-row">
+                            <div class="fm-settings-copy">
+                                <label class="fm-settings-label" for="fm_settings_prism">{{ _('Prism code highlighting') }}</label>
+                                <div class="fm-settings-desc">{{ _('Highlight code while editing. Highlighting is automatically disabled for unsupported browsers and large files.') }}</div>
+                            </div>
+                            <label class="fm-settings-switch" for="fm_settings_prism">
+                                <input id="fm_settings_prism" type="checkbox">
+                                <span class="fm-settings-switch-slider"></span>
+                            </label>
+                        </div>
+                        <div id="fm_prism_details" hidden>
+                            <div id="fm_prism_tools"></div>
+                            <div class="fm-settings-row">
+                                <div class="fm-settings-copy">
+                                    <span class="fm-settings-label">Prism</span>
+                                    <div id="fm_prism_version" class="fm-settings-desc"></div>
+                                    <div id="fm_prism_status" class="fm-settings-desc" role="status"></div>
+                                </div>
+                                <div class="fm-nginx-actions">
+                                    <label for="fm_prism_source" class="fm-settings-label">{{ _('Update source') }}</label>
+                                    <select id="fm_prism_source" class="fm-settings-control">
+                                        <option value="npmmirror">npmmirror</option>
+                                        <option value="jsdelivr">jsDelivr</option>
+                                        <option value="unpkg">UNPKG</option>
+                                    </select>
+                                    <button id="fm_prism_check" class="fm-dialog-action" type="button">{{ _('Check for updates') }}</button>
+                                    <button id="fm_prism_update" class="fm-dialog-action primary" type="button" hidden>{{ _('Update now') }}</button>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                     <div class="fm-settings-page-actions">
-                        <button id="fm_settings_basic_cancel" class="fm-dialog-action" type="button">{{ _('Cancel') }}</button>
-                        <button id="fm_settings_basic_save" class="fm-dialog-action primary" type="button">{{ _('Save') }}</button>
+                        <button id="fm_settings_editor_cancel" class="fm-dialog-action" type="button">{{ _('Cancel') }}</button>
+                        <button id="fm_settings_editor_save" class="fm-dialog-action primary" type="button">{{ _('Save') }}</button>
                     </div>
                 </div>
                 <div id="fm_settings_panel_nginx" class="fm-settings-panel" role="tabpanel" aria-labelledby="fm_settings_tab_nginx">
@@ -1235,7 +1299,7 @@ window.HarborFile.tr = function (msgid) {
             <input id="fm_bookmark_path" class="fm-form-input" type="text" autocomplete="off">
             <label class="fm-form-label" for="fm_bookmark_folder">{{ _('Folder') }}</label>
             <select id="fm_bookmark_folder" class="fm-form-select">
-                <option value="">{{ _('No folder') }}</option>
+                <option value="">{{ _('Ungrouped') }}</option>
             </select>
             <input id="fm_bookmark_folder_new" class="fm-form-input" type="text" maxlength="64" autocomplete="off" style="display:none" placeholder="{{ _('Folder name') }}">
         </div>
@@ -1625,6 +1689,12 @@ window.HarborFile.tr = function (msgid) {
         }
     });
     document.getElementById('fm_settings_glass_adjust').addEventListener('click', HF.open_glass_tuner);
+    document.getElementById('fm_settings_editor_save').addEventListener('click', HF.save_editor_settings_dialog);
+    document.getElementById('fm_settings_editor_cancel').addEventListener('click', HF.close_modal);
+    document.getElementById('fm_settings_prism').addEventListener('change', function() { HF.render_prism_settings(true); });
+    document.getElementById('fm_prism_source').addEventListener('change', function() { HF.render_prism_settings(); });
+    document.getElementById('fm_prism_check').addEventListener('click', HF.check_prism_update);
+    document.getElementById('fm_prism_update').addEventListener('click', HF.start_prism_update);
     document.getElementById('fm_settings_basic_save').addEventListener('click', HF.save_basic_settings_dialog);
     document.getElementById('fm_settings_nginx_save').addEventListener('click', HF.save_web_server_settings_dialog);
     document.getElementById('fm_nginx_recommend').addEventListener('click', HF.use_recommended_nginx_settings);
