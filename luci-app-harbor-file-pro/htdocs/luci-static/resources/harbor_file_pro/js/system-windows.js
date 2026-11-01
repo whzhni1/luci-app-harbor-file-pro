@@ -2,7 +2,7 @@
 (function (HF) {
     HF.format_host_for_url = function format_host_for_url(hostname) {
         var host = String(hostname || '');
-        return host.indexOf(':') >= 0 ? '[' + host + ']' : host;
+        return host.indexOf(':') >= 0 && host.charAt(0) !== '[' ? '[' + host + ']' : host;
     }
 
     HF.resolve_terminal_target = function resolve_terminal_target(item) {
@@ -33,34 +33,12 @@
 
     HF.resolve_terminal_url = function resolve_terminal_url(info, remote_host) {
         var raw = String(info && info.url || '').trim();
-        if (remote_host) {
-            var remote_protocol = Number(info && info.ssl) === 1 ? 'https:' : 'http:';
-            var remote_origin = remote_protocol + '//' + HF.format_host_for_url(remote_host);
-            if (raw) {
-                var remote_url = new URL(raw, remote_origin + '/');
-                if (!/^https?:$/.test(remote_url.protocol) || remote_url.hostname.toLowerCase() !== new URL(remote_origin).hostname.toLowerCase() || remote_url.username || remote_url.password) throw new Error(HF.labels.terminal_failed);
-                return remote_url.href;
-            }
-            return remote_origin + ':' + (Number(info && info.port) || 7681) + '/';
-        }
-        var https_page = window.location.protocol === 'https:';
-
-        if (raw) {
-            if (raw.charAt(0) === '/') {
-                return window.location.origin + raw;
-            }
-            if (/^https?:\/\//i.test(raw)) {
-                if (https_page) {
-                    return raw;
-                }
-            }
-        }
-
-        
-        var protocol = (https_page || Number(info && info.ssl) === 1) ? 'https:' : 'http:';
-        var host = HF.format_host_for_url(window.location.hostname);
-        var port = Number(info && info.port) || 7681;
-        return protocol + '//' + host + ':' + port + '/';
+        var protocol = Number(info && info.ssl) === 1 ? 'https:' : 'http:';
+        var host = HF.format_host_for_url(remote_host || window.location.hostname);
+        var origin = remote_host ? protocol + '//' + host : window.location.origin;
+        var url = new URL(raw || protocol + '//' + host + ':' + (Number(info && info.port) || 7681) + '/', origin + '/');
+        if (!/^https?:$/.test(url.protocol) || url.username || url.password) throw new Error(HF.labels.terminal_failed);
+        return url.href;
     };
 
     HF.set_settings_tab = function set_settings_tab(tab) {
@@ -91,7 +69,7 @@
         var actions = document.getElementById('fm_nginx_page_actions');
         var fcm_note = document.getElementById('fm_nginx_fcm_note');
         title.textContent = HF.tr('Nginx');
-        status.textContent = running ? HF.labels.installed : HF.labels.not_installed;
+        status.textContent = running || HF.state.preferences.nginx_available ? HF.labels.installed : HF.labels.not_installed;
         status.style.display = 'inline-flex';
         status.classList.toggle('checking', false);
         install.style.display = running ? 'none' : 'inline-flex';
@@ -357,66 +335,24 @@
         return 'https://' + hostname + '/';
     }
 
-    HF.begin_nginx_restart_countdown = function begin_nginx_restart_countdown() {
-        if (HF.state.nginx_install_countdown_timer) {
-            return;
-        }
-        document.getElementById('fm_nginx_spinner').style.display = 'block';
-        document.getElementById('fm_nginx_install_actions').style.display = 'none';
+    HF.begin_nginx_restart_countdown = function(job) {
+        HF.stop_nginx_install_timers();
         var seconds = 60;
-        var tick = function() {
-            document.getElementById('fm_nginx_install_text').textContent =
-                HF.format_label(HF.labels.nginx_restart_countdown, seconds);
-            if (seconds <= 0) {
-                HF.state.nginx_install_countdown_timer = null;
-                window.location.replace(HF.nginx_https_url());
-                return;
-            }
-            seconds--;
+        function tick() {
+            if (HF.state.install_job !== job) { HF.stop_nginx_install_timers(); return; }
+            job.data.message = HF.format_label(HF.labels.nginx_restart_countdown, seconds);
+            HF.update_package_install_view(job.data);
+            if (seconds-- <= 0) { HF.state.nginx_install_countdown_timer = null; window.location.replace(HF.nginx_https_url()); return; }
             HF.state.nginx_install_countdown_timer = setTimeout(tick, 1000);
-        };
+        }
         tick();
-    }
+    };
 
-    HF.fail_nginx_install = function fail_nginx_install(message) {
-        HF.stop_nginx_install_timers();
-        HF.state.nginx_installing = false;
-        document.getElementById('fm_nginx_spinner').style.display = 'none';
-        document.getElementById('fm_nginx_install_text').textContent =
-            message || HF.labels.nginx_install_failed;
-        document.getElementById('fm_nginx_install_actions').style.display = 'flex';
-        HF.set_error_status(message || HF.labels.nginx_install_failed);
-    }
-
-    HF.start_nginx_install = function start_nginx_install() {
-        var button = document.getElementById('fm_nginx_confirm_start');
-        button.disabled = true;
-        HF.close_modal();
-        HF.stop_nginx_install_timers();
-        HF.state.nginx_installing = true;
-        HF.state.nginx_install_task = null;
-        document.getElementById('fm_nginx_spinner').style.display = 'block';
-        document.getElementById('fm_nginx_install_text').textContent = HF.labels.installing_nginx;
-        document.getElementById('fm_nginx_install_actions').style.display = 'none';
-        HF.open_modal('fm_nginx_install_dialog');
-        HF.begin_nginx_restart_countdown();
-        HF.Util.ajax({
-            url: HF.api.nginx_install_start,
-            type: 'POST',
-            dataType: 'json',
-            success: function(res) {
-                if (!res || res.code !== 0) {
-                    button.disabled = false;
-                    HF.fail_nginx_install((res && res.message) || HF.labels.nginx_install_failed);
-                    return;
-                }
-                HF.state.nginx_install_task = res.data || {};
-            },
-            error: function(xhr) {
-                HF.state.nginx_install_task = null;
-            }
-        });
-    }
+    HF.start_nginx_install = function() {
+        HF.close_file_dialog('fm_nginx_confirm_dialog');
+        return HF.install_plugin({ name: 'nginx-ssl-util luci-nginx', action: 'nginx_install_start', params: {}, verify: function() { return HF.check_dependency('nginx', {}); },
+            on_start: HF.begin_nginx_restart_countdown, on_error: function(data, job) { if (HF.state.install_job === job) HF.stop_nginx_install_timers(); }, on_close: HF.stop_nginx_install_timers });
+    };
 
     HF.open_modal = function open_modal(id) {
         HF.hide_item_hover_card();
@@ -431,199 +367,67 @@
         dialog.style.display = display_mode;
     }
 
-    HF.stop_terminal_check = function stop_terminal_check() {
-        if (HF.state.terminal_check_timer) {
-            clearTimeout(HF.state.terminal_check_timer);
-            HF.state.terminal_check_timer = null;
+    HF.create_terminal_window = function create_terminal_window(options) {
+        var owner = HF.file_context(options.owner || {});
+        var fields = Object.create(null), closed = false, timer = null, sequence = 0, url = '', installing = false, dependency = null;
+        var panel = document.getElementById('fm_terminal_dialog').querySelector('.fm-terminal-shell').cloneNode(true);
+        panel.querySelectorAll('[id]').forEach(function(node) { fields[node.id] = node; node.removeAttribute('id'); });
+        var frame = fields.fm_terminal_frame, loading = fields.fm_terminal_loading, failure = fields.fm_terminal_error;
+        var install = fields.fm_terminal_install_tool, external = fields.fm_terminal_open_external;
+        var record = HF.window_manager.create({ title: options.title, icon: 'terminal', className: 'fm-remote-terminal', content: panel, width: 820, height: 590, minWidth: 390, minHeight: 270,
+            onClose: function() { closed = true; sequence++; clearTimeout(timer); frame.onload = null; frame.onerror = null; frame.remove(); }
+        });
+        var controls = record.element.querySelector('.fm-window-controls');
+        function openExternal() { if (url) window.open(url, '_blank', 'noopener,noreferrer'); }
+        var externalControl = HF.window_manager.add_control(controls, 'external', '↗', HF.labels.open_terminal_external, openExternal);
+        controls.insertBefore(externalControl, controls.firstChild); externalControl.disabled = true;
+        var reconnect = HF.window_manager.add_control(controls, 'reconnect', '↻', HF.labels.refresh, connect);
+        controls.insertBefore(reconnect, controls.firstChild);
+        function failed(message, missing) {
+            clearTimeout(timer); loading.classList.remove('show'); failure.classList.add('show');
+            fields.fm_terminal_error_text.textContent = HF.labels.terminal_failed;
+            fields.fm_terminal_error_hint.textContent = message;
+            install.style.display = missing ? '' : 'none'; external.style.display = url ? '' : 'none';
         }
-    }
-
-    HF.set_terminal_loading = function set_terminal_loading(message, hint) {
-        var loading = document.getElementById('fm_terminal_loading');
-        var error = document.getElementById('fm_terminal_error');
-        document.getElementById('fm_terminal_loading_text').textContent = message || HF.labels.connecting_terminal;
-        document.getElementById('fm_terminal_loading_hint').textContent = hint || '';
-        document.getElementById('fm_terminal_install_tool').style.display = 'none';
-        loading.classList.add('show');
-        error.classList.remove('show');
-    }
-
-    HF.set_terminal_error = function set_terminal_error(message, hint, show_install, show_external) {
-        var loading = document.getElementById('fm_terminal_loading');
-        var error = document.getElementById('fm_terminal_error');
-        document.getElementById('fm_terminal_error_text').textContent = message || HF.labels.terminal_failed;
-        document.getElementById('fm_terminal_error_hint').textContent = hint || HF.labels.terminal_failed_hint;
-        document.getElementById('fm_terminal_install_tool').style.display = show_install ? 'inline-flex' : 'none';
-        document.getElementById('fm_terminal_open_external').style.display = show_external ? 'inline-flex' : 'none';
-        loading.classList.remove('show');
-        error.classList.add('show');
-        HF.state.terminal_ready = false;
-    }
-
-    HF.clear_terminal_dialog = function clear_terminal_dialog(unload_frame) {
-        HF.stop_terminal_check();
-        var frame = document.getElementById('fm_terminal_frame');
-        frame.onload = null;
-        frame.onerror = null;
-        if (unload_frame) {
-            frame.setAttribute('src', 'about:blank');
-            HF.state.terminal_url = '';
-            HF.state.terminal_ready = false;
+        function offerInstall(offer) {
+            if (closed || installing) return;
+            var requestSequence = sequence;
+            installing = true; install.disabled = true;
+            function finished() { installing = false; install.disabled = false; }
+            HF.start_terminal_tool_install(function() { finished(); if (!closed && requestSequence === sequence) connect(true); }, finished, owner, dependency, offer);
         }
-        document.getElementById('fm_terminal_loading').classList.remove('show');
-        document.getElementById('fm_terminal_error').classList.remove('show');
-        document.getElementById('fm_terminal_loading_hint').textContent = '';
-        document.getElementById('fm_terminal_install_tool').style.display = 'none';
-        document.getElementById('fm_terminal_open_external').style.display = 'none';
-        HF.state.terminal_context = null;
-    }
-
-    HF.attach_terminal_frame = function attach_terminal_frame(url) {
-        var frame = document.getElementById('fm_terminal_frame');
-        HF.set_terminal_loading(HF.labels.connecting_terminal, HF.labels.terminal_service_url + ': ' + url);
-        HF.stop_terminal_check();
-        var finished = false;
-
-        function clear() {
-            HF.stop_terminal_check();
-            frame.onload = null;
-            frame.onerror = null;
+        function connect(retried) {
+            if (closed) return;
+            var requestSequence = ++sequence;
+            frame.onload = null; frame.onerror = null;
+            var next = frame.cloneNode(false); next.src = 'about:blank'; frame.replaceWith(next); frame = next;
+            url = ''; externalControl.disabled = true;
+            clearTimeout(timer); failure.classList.remove('show'); loading.classList.add('show');
+            install.style.display = 'none'; external.style.display = 'none';
+            fields.fm_terminal_loading_hint.textContent = options.title + ' · ' + owner.path;
+            HF.request_json(HF.file_endpoint('terminal_info', owner), {}, function(info) {
+                HF.check_dependency('ttyd', owner, info).then(function(info) {
+                    if (closed || sequence !== requestSequence) return;
+                    dependency = info;
+                    if (!info.available) { failed(HF.labels.terminal_service_missing, true); if (retried !== true) offerInstall(true); return; }
+                    try { url = HF.resolve_terminal_url(info, options.host); externalControl.disabled = false; } catch (error) { return failed(error.message, false); }
+                    if (window.location.protocol === 'https:' && /^http:/i.test(url)) return failed(HF.labels.terminal_https_hint, false);
+                    frame.onload = function() { if (closed || sequence !== requestSequence) return; clearTimeout(timer); loading.classList.remove('show'); failure.classList.remove('show'); };
+                    frame.onerror = function() { if (!closed && sequence === requestSequence) failed(HF.labels.terminal_failed_hint, false); };
+                    timer = setTimeout(function() { if (!closed && sequence === requestSequence) failed(HF.labels.terminal_failed_hint, false); }, 8000);
+                    frame.src = url;
+                }, function(error) { if (!closed && sequence === requestSequence) failed(error.message, false); });
+            }, function(message) { if (!closed && sequence === requestSequence) failed(message, false); });
         }
-
-        frame.onload = function() {
-            finished = true;
-            clear();
-            document.getElementById('fm_terminal_loading').classList.remove('show');
-            document.getElementById('fm_terminal_error').classList.remove('show');
-            HF.state.terminal_url = url;
-            HF.state.terminal_ready = true;
-        };
-        frame.onerror = function() {
-            finished = true;
-            clear();
-            HF.set_terminal_error(HF.labels.terminal_failed, HF.labels.terminal_failed_hint);
-            HF.set_error_status(HF.labels.terminal_failed);
-        };
-        frame.setAttribute('src', url);
-
-        if (/^https:/i.test(url)) {
-            HF.state.terminal_check_timer = setTimeout(function() {
-                if (!finished) {
-                    clear();
-                    var https_page = window.location.protocol === 'https:';
-                    var hint = https_page ? HF.labels.terminal_https_cert_hint : HF.labels.terminal_failed_hint;
-                    HF.set_terminal_error(HF.labels.terminal_failed, hint, false, https_page);
-                    HF.set_error_status(HF.labels.terminal_failed);
-                }
-            }, 8000);
-        }
-    }
-
-    HF.test_terminal_connection = function test_terminal_connection(url, on_ok, on_fail) {
-        HF.stop_terminal_check();
-        var finished = false;
-
-        function finish(success) {
-            if (finished) {
-                return;
-            }
-            finished = true;
-            HF.stop_terminal_check();
-            if (success) {
-                on_ok();
-            } else {
-                on_fail();
-            }
-        }
-
-        HF.state.terminal_check_timer = setTimeout(function() {
-            finish(false);
-        }, 5000);
-
-        if (!window.fetch) {
-            finish(true);
-            return;
-        }
-
-        try {
-            window.fetch(url, {
-                method: 'GET',
-                mode: 'no-cors',
-                cache: 'no-store'
-            }).then(function() {
-                finish(true);
-            }).catch(function() {
-                finish(false);
-            });
-        } catch (error) {
-            finish(false);
-        }
-    }
+        install.addEventListener('click', offerInstall);
+        external.addEventListener('click', openExternal);
+        connect(); return record;
+    };
 
     HF.open_terminal = function open_terminal(item) {
-        HF.hide_context_menus();
-        HF.clear_terminal_dialog(false);
-        HF.state.terminal_context = HF.resolve_terminal_target(item);
-        document.getElementById('fm_terminal_title').textContent = HF.labels.terminal;
-        HF.set_terminal_loading(HF.labels.connecting_terminal, HF.labels.terminal_current_path + ': ' + HF.state.terminal_context.path);
-        HF.open_modal('fm_terminal_dialog');
-        HF.Util.ajax({
-            url: HF.api.terminal_info,
-            type: 'GET',
-            dataType: 'json',
-            success: function(res) {
-                var data = res && res.code === 0 ? (res.data || {}) : null;
-                if (!data || !data.available) {
-                    HF.set_terminal_error(HF.labels.terminal_failed, HF.labels.terminal_service_missing, true);
-                    HF.set_error_status((res && res.message) || HF.labels.terminal_service_missing);
-                    return;
-                }
-                HF.state.terminal_info = data;
-                var url = HF.resolve_terminal_url(data);
-                if (window.location.protocol === 'https:' && /^http:/i.test(url)) {
-                    HF.set_terminal_error(HF.labels.terminal_failed, HF.labels.terminal_https_hint, false, true);
-                    HF.set_error_status(HF.labels.terminal_failed);
-                    return;
-                }
-                if (HF.state.terminal_ready && HF.state.terminal_url === url) {
-                    document.getElementById('fm_terminal_loading').classList.remove('show');
-                    document.getElementById('fm_terminal_error').classList.remove('show');
-                    return;
-                }
-                if (/^https:/i.test(url)) {
-                    HF.attach_terminal_frame(url);
-                    return;
-                }
-                HF.test_terminal_connection(url, function() {
-                    HF.attach_terminal_frame(url);
-                }, function() {
-                    HF.set_terminal_error(HF.labels.terminal_failed, HF.labels.terminal_failed_hint);
-                    HF.set_error_status(HF.labels.terminal_failed);
-                });
-            },
-            error: function() {
-                HF.set_terminal_error(HF.labels.terminal_failed, HF.labels.terminal_failed_hint);
-                HF.set_error_status(HF.labels.terminal_failed);
-            }
-        });
-    }
-
-    HF.open_terminal_external = function open_terminal_external() {
-        var info = HF.state.terminal_info || {};
-        var host = HF.format_host_for_url(window.location.hostname);
-        var port = Number(info.port) || 7681;
-        var raw = String(info.url || '').trim();
-        var url;
-        if (raw && /^https?:\/\//i.test(raw)) {
-            url = raw;
-        } else if (raw && raw.charAt(0) === '/') {
-            url = window.location.origin + raw;
-        } else {
-            var protocol = Number(info.ssl) === 1 ? 'https:' : 'http:';
-            url = protocol + '//' + host + ':' + port + '/';
-        }
-        window.open(url, '_blank', 'noopener');
-    }
+        HF.hide_context_menus(); HF.hide_details();
+        return HF.create_terminal_window({ owner: HF.resolve_terminal_target(item), title: HF.labels.terminal });
+    };
 
     HF.close_package_install = function close_package_install() {
         if (HF.state.install_task && !HF.state.install_task.done) return;
@@ -640,18 +444,6 @@
             HF.close_package_install();
             return;
         }
-        if (HF.state.nginx_installing &&
-                document.getElementById('fm_nginx_install_dialog').style.display !== 'none') {
-            return;
-        }
-        if (HF.state.install_task && !HF.state.install_task.done &&
-                document.getElementById('fm_package_install_dialog').style.display !== 'none') {
-            return;
-        }
-        if (HF.state.thumbnail_task && !HF.state.thumbnail_task.done &&
-                document.getElementById('fm_thumbnail_dialog').style.display !== 'none') {
-            return;
-        }
         if (HF.state.archive_task && !HF.state.archive_task.done &&
                 document.getElementById('fm_archive_task_dialog').style.display !== 'none') {
             return;
@@ -661,33 +453,27 @@
         var cancel_pending = document.getElementById('fm_overwrite_dialog').style.display !== 'none' && HF.state.pending_upload;
         var dialogs = document.querySelectorAll('.fm-dialog');
         for (var i = 0; i < dialogs.length; i++) {
-            dialogs[i].style.display = 'none';
+            if (!dialogs[i]._fmWindow || !dialogs[i]._fmWindow.options.keepOnModalClose) dialogs[i].style.display = 'none';
         }
         document.getElementById('fm_modal_mask').style.display = 'none';
         if (HF.window_manager && HF.window_manager.close_all_legacy) {
             HF.window_manager.close_all_legacy();
         }
 
-        HF.clear_terminal_dialog(false);
         if (cancel_pending) {
             HF.state.pending_upload = null;
             HF.state.uploading = false;
             HF.update_toolbar();
             document.getElementById('fm_upload_panel').className = 'fm-upload-panel';
         }
-        HF.stop_install_poll();
-        HF.stop_thumbnail_poll();
         HF.stop_archive_poll();
         HF.state.name_action = null;
         HF.state.delete_item = null;
         HF.state.delete_items = [];
         HF.state.transfer_action = null;
-        HF.state.install_item = null;
-        HF.state.install_task = null;
+        if (!HF.state.install_job) HF.state.install_item = null;
         HF.state.archive_items = [];
         HF.state.archive_task = null;
-        HF.state.thumbnail_task = null;
-        HF.state.thumbnail_path = '';
     }
 
     HF.updatePermissionCheckboxes = function updatePermissionCheckboxes(modeStr) {

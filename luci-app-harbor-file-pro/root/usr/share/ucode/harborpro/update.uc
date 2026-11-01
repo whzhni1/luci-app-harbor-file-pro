@@ -719,7 +719,7 @@ function api_prism_start() {
 	if (!version)
 		return fail(http, 1, tr('Invalid Prism update version'));
 	let tools = prism_dependencies();
-	if (length(tools.missing)) return fail(http, 1, prism_missing_notice(tools));
+	if (length(tools.missing)) return fail(http, 1, prism_missing_notice(tools), { missing_tools: tools.missing });
 	if (!prism_runtime()) return fail(http, 1, tr('Cannot create runtime directory'));
 	if (task_running(read_state()) || !_fs.mkdir(PRISM_WORK + '/lock', 0o700))
 		return write_json_status(http, 409, 'Conflict', { code: 1, message: tr('Another update is running. Please retry later.') });
@@ -815,7 +815,7 @@ function api_update_start() {
 			{ code: 1, message: tr('Another installation is already running') });
 
 	if (!detect_fetcher())
-		return fail(http, 1, 'curl or wget is required');
+		return fail(http, 1, 'curl or wget is required', { missing_tool: 'curl', package_name: 'curl', dependency_preflight: true, device_id: '', device_revision: '' });
 
 	let pm = detect_package_manager();
 	if (!pm)

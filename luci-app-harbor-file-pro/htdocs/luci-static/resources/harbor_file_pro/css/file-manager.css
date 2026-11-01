@@ -1837,12 +1837,6 @@
     padding: 16px;
 }
 
-.fm-settings-dialog{
-    width: min(900px, calc(100vw - 32px));
-    max-height: calc(100vh - 32px);
-    overflow: hidden;
-}
-
 .fm-settings-dialog .fm-dialog-header{
     min-height: 48px;
     padding: 0 12px 0 16px;
@@ -2060,38 +2054,7 @@
     color: #f0ad66;
 }
 
-.fm-nginx-progress{
-    display: flex;
-    align-items: center;
-    flex-direction: column;
-    gap: 14px;
-    min-height: 88px;
-    text-align: center;
-}
 
-.fm-nginx-spinner{
-    width: 24px;
-    height: 24px;
-    flex: 0 0 auto;
-    border: 3px solid rgba(40, 120, 212, 0.18);
-    border-top-color: var(--fm-accent);
-    border-radius: 50%;
-    animation: fm-terminal-spin 0.82s linear infinite;
-}
-
-.fm-nginx-progress-text{
-    color: var(--fm-text);
-    font-size: 13px;
-    line-height: 1.6;
-}
-
-.fm-nginx-progress-hint{
-    margin-top: 4px;
-    color: var(--fm-muted);
-    font-size: 12px;
-    line-height: 1.6;
-    text-align: center;
-}
 
 .fm-settings-copy{
     min-width: 0;
@@ -2353,7 +2316,6 @@
 #fm_package_install_dialog,
 #fm_thumbnail_dialog,
 #fm_archive_task_dialog,
-#fm_nginx_install_dialog,
 #fm_nginx_confirm_dialog{
     width: min(720px, calc(100vw - 32px));
     height: auto;
@@ -2615,10 +2577,6 @@
         min-width: 0;
         min-height: 0;
         resize: none;
-    }
-
-    .fm-settings-dialog{
-        width: min(100vw - 20px, 760px);
     }
 
     .fm-settings-body{
@@ -3401,10 +3359,7 @@ html[data-harbor-file-manager] #view.fm-fluid-host{
     justify-content: flex-end;
     min-width: 0;
 }
-.fm-remote-install-window .fm-window-body {
-    overflow: auto;
-}
-.fm-remote-install-panel {
+.fm-archive-task-panel {
     min-width: 0;
     width: 100%;
 }

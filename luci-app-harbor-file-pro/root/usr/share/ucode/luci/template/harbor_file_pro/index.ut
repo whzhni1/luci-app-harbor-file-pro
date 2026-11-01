@@ -43,7 +43,6 @@ HarborFile.init({
         save_editor_upload: '{{ dispatcher.build_url('admin', 'harbor_pro', 'save_editor_upload') }}',
         thumbnail_generate_start: '{{ dispatcher.build_url('admin', 'harbor_pro', 'thumbnail_generate_start') }}',
         thumbnail_generate_status: '{{ dispatcher.build_url('admin', 'harbor_pro', 'thumbnail_generate_status') }}',
-        thumbnail_tool_install_start: '{{ dispatcher.build_url('admin', 'harbor_pro', 'thumbnail_tool_install_start') }}',
         upload_check: '{{ dispatcher.build_url('admin', 'harbor_pro', 'upload_check') }}',
         upload: '{{ dispatcher.build_url('admin', 'harbor_pro', 'upload') }}',
         create_directory: '{{ dispatcher.build_url('admin', 'harbor_pro', 'create_directory') }}',
@@ -81,7 +80,6 @@ HarborFile.init({
     labels: {
         remote_show_password: '{{ _('Show password') }}',
         remote_hide_password: '{{ _('Hide password') }}',
-        remote_agent_install_confirm: '{{ _('Install the missing remote file tools (ucode, ucode-mod-fs and ucode-mod-uci) on this device?') }}',
         remote_agent_not_ready: '{{ _('Remote file tools are not ready') }}',
         remote_stale_device: '{{ _('Device settings changed; reopen the device') }}',
 
@@ -107,7 +105,6 @@ HarborFile.init({
         remote_root_required: '{{ _('Remote installation requires a root SSH account') }}',
         remote_pm_missing: '{{ _('Remote device has neither opkg nor apk') }}',
         remote_install_remote: '{{ _('Install on remote device') }}',
-        remote_install_confirm: '{{ _('Update package indexes and install coreutils-stat on this remote device? Dependencies may also be installed.') }}',
         remote_install_uncertain: '{{ _('Installation status is uncertain. Check the remote device before starting another installation.') }}',
         remote_devices: '{{ _('Remote devices') }}',
         remote_unavailable: '{{ _('Copy this item to the local device to use this operation') }}',
@@ -136,8 +133,6 @@ HarborFile.init({
         remote_cancel: '{{ _('Cancel') }}',
         remote_remove: '{{ _('Delete') }}',
         remote_loading: '{{ _('Connecting') }}',
-        remote_terminal_direct: '{{ _('The browser must be able to reach this remote device’s ttyd port. This is not an SSH tunnel; the local terminal will not be used as a fallback.') }}',
-        remote_terminal_install: '{{ _('Install ttyd on this remote device? Its package scripts may start a web terminal service. Review the device’s authentication and network access settings.') }}',
         remote_outcome_unknown: '{{ _('The remote operation outcome is unknown. Check the device before retrying; the operation may still be running.') }}',
         remote_waiting: '{{ _('Waiting for task status') }}',
         remote_copy_only: '{{ _('Use Copy instead of Cut for remote transfers') }}',
@@ -436,7 +431,7 @@ HarborFile.init({
         terminal_https_cert_hint: '{{ _('The terminal uses a certificate the browser cannot verify (for example a self-signed certificate), so it is blocked inside this window. Open the terminal in a new window and accept the certificate, or install a trusted certificate for ttyd') }}',
         terminal_current_path: '{{ _('Current path') }}',
         terminal_service_url: '{{ _('Service address') }}',
-        terminal_service_missing: '{{ _('The ttyd service is not installed or not configured') }}',
+        terminal_service_missing: '{{ _('No executable ttyd program was found') }}',
         install_terminal_tool: '{{ _('Install terminal plugin') }}',
         open_terminal_external: '{{ _('Open terminal in a new window') }}',
         web_service: '{{ _('Web service') }}',
@@ -875,7 +870,7 @@ window.HarborFile.tr = function (msgid) {
     </div>
 </section>
 
-<section id="fm_settings_dialog" class="fm-dialog fm-settings-dialog" role="dialog" aria-modal="true" aria-labelledby="fm_settings_title">
+<section id="fm_settings_dialog" data-window-size="shared" class="fm-dialog fm-settings-dialog" role="dialog" aria-modal="true" aria-labelledby="fm_settings_title">
     <div class="fm-dialog-header">
         <div id="fm_settings_title" class="fm-dialog-title">{{ _('Settings') }}</div>
         <button class="fm-dialog-close" type="button" aria-label="{{ _('Close') }}">&times;</button>
@@ -1222,21 +1217,7 @@ window.HarborFile.tr = function (msgid) {
     </div>
 </section>
 
-<section id="fm_nginx_install_dialog" class="fm-dialog" role="dialog" aria-modal="true" aria-labelledby="fm_nginx_install_title">
-    <div class="fm-dialog-header">
-        <div id="fm_nginx_install_title" class="fm-dialog-title">{{ _('Installing Nginx') }}</div>
-    </div>
-    <div class="fm-nginx-install-body">
-        <div class="fm-nginx-progress">
-            <div id="fm_nginx_spinner" class="fm-nginx-spinner" aria-hidden="true"></div>
-            <div id="fm_nginx_install_text" class="fm-nginx-progress-text">{{ _('Installing Nginx, please wait.') }}</div>
-        </div>
-        <div id="fm_nginx_install_hint" class="fm-nginx-progress-hint">{{ _('The web interface may be interrupted during installation. After installation, the login page will be reopened. If it cannot be accessed, please try again later.') }}</div>
-    </div>
-    <div id="fm_nginx_install_actions" class="fm-dialog-actions" style="display:none">
-        <button id="fm_nginx_install_done" class="fm-dialog-action primary" type="button">{{ _('Close') }}</button>
-    </div>
-</section>
+
 
 <section id="fm_overwrite_dialog" class="fm-dialog" role="dialog" aria-modal="true" aria-labelledby="fm_overwrite_title">
     <div class="fm-dialog-header">
@@ -1434,7 +1415,6 @@ window.HarborFile.tr = function (msgid) {
         <pre id="fm_archive_task_log" class="fm-package-log">{{ _('No log yet') }}</pre>
     </div>
     <div class="fm-dialog-actions">
-        <button id="fm_archive_install_tool" class="fm-dialog-action primary" type="button" style="display:none">{{ _('Install') }}</button>
         <button id="fm_archive_task_done" class="fm-dialog-action primary" type="button">{{ _('Close') }}</button>
     </div>
 </section>
@@ -1477,6 +1457,7 @@ window.HarborFile.tr = function (msgid) {
         <pre id="fm_package_install_log" class="fm-package-log">{{ _('No log yet') }}</pre>
     </div>
     <div class="fm-dialog-actions">
+        <button id="fm_package_install_start" class="fm-dialog-action primary" type="button" style="display:none">{{ _('Install') }}</button>
         <button id="fm_package_install_done" class="fm-dialog-action primary" type="button">{{ _('Close') }}</button>
     </div>
 </section>
@@ -1512,7 +1493,7 @@ window.HarborFile.tr = function (msgid) {
         <button class="fm-dialog-close" type="button" aria-label="{{ _('Close') }}">&times;</button>
     </div>
     <div class="fm-terminal-shell">
-        <iframe id="fm_terminal_frame" class="fm-terminal-frame" src="about:blank" title="{{ _('Terminal') }}"></iframe>
+        <iframe id="fm_terminal_frame" class="fm-terminal-frame" src="about:blank" referrerpolicy="no-referrer" title="{{ _('Terminal') }}"></iframe>
         <div id="fm_terminal_loading" class="fm-terminal-overlay show">
             <div class="fm-terminal-panel">
                 <div class="fm-terminal-spinner"></div>
@@ -1603,7 +1584,7 @@ window.HarborFile.tr = function (msgid) {
             }
         });
     });
-    document.getElementById('fm_update_check').addEventListener('click', function() { HF.check_update(); });
+    document.getElementById('fm_update_check').addEventListener('click', function() { HF.check_update(true); });
     document.getElementById('fm_update_start').addEventListener('click', function() { HF.start_update(); });
     document.getElementById('fm_update_mirror').addEventListener('change', function() {
         HF.reset_update_result();
@@ -1658,12 +1639,13 @@ window.HarborFile.tr = function (msgid) {
     document.getElementById('fm_settings_basic_cancel').addEventListener('click', HF.close_modal);
     document.getElementById('fm_settings_nginx_cancel').addEventListener('click', HF.close_modal);
     document.getElementById('fm_nginx_confirm_cancel').addEventListener('click', HF.close_modal);
-    document.getElementById('fm_nginx_install_done').addEventListener('click', HF.close_modal);
     document.getElementById('fm_package_confirm_cancel').addEventListener('click', HF.close_modal);
+    document.getElementById('fm_package_install_start').addEventListener('click', function() { if (HF.state.install_job) HF.state.install_job.start(); });
+    document.getElementById('fm_thumbnail_install_tool').addEventListener('click', HF.start_thumbnail_tool_install);
+    document.getElementById('fm_thumbnail_done').addEventListener('click', function() { HF.close_file_dialog('fm_thumbnail_dialog'); });
     document.getElementById('fm_package_install_done').addEventListener('click', HF.close_package_install);
     document.getElementById('fm_archive_cancel').addEventListener('click', HF.close_modal);
     document.getElementById('fm_archive_task_done').addEventListener('click', HF.close_modal);
-    document.getElementById('fm_archive_install_tool').addEventListener('click', HF.start_archive_tool_install);
     document.getElementById('fm_archive_format').addEventListener('change', HF.sync_archive_format_options);
     document.getElementById('fm_archive_start').addEventListener('click', HF.submit_archive_dialog);
     document.getElementById('fm_extract_cancel').addEventListener('click', HF.close_modal);
@@ -1683,10 +1665,6 @@ window.HarborFile.tr = function (msgid) {
             HF.submit_archive_dialog();
         }
     });
-    document.getElementById('fm_thumbnail_done').addEventListener('click', HF.close_modal);
-    document.getElementById('fm_thumbnail_install_tool').addEventListener('click', HF.start_thumbnail_tool_install);
-    document.getElementById('fm_terminal_install_tool').addEventListener('click', HF.start_terminal_tool_install);
-    document.getElementById('fm_terminal_open_external').addEventListener('click', HF.open_terminal_external);
     document.getElementById('fm_package_confirm_start').addEventListener('click', function() {
         if (HF.state.install_item) {
             HF.start_package_install(HF.state.install_item);
@@ -1992,6 +1970,7 @@ window.HarborFile.tr = function (msgid) {
     for (var close_index = 0; close_index < close_buttons.length; close_index++) {
         close_buttons[close_index].addEventListener('click', function() {
             if (this.closest('#fm_target_dialog')) HF.close_target_dialog();
+            else if (this.closest('#fm_thumbnail_dialog')) HF.close_file_dialog('fm_thumbnail_dialog');
             else if (this.closest('#fm_package_install_dialog')) HF.close_package_install();
             else HF.close_modal();
         });

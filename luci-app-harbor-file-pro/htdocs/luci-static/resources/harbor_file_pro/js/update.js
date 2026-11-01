@@ -18,7 +18,7 @@
         }
     };
 
-    HF.check_update = function check_update() {
+    HF.check_update = function check_update(interactive) {
         var latest = document.getElementById('fm_about_latest');
         var btn = document.getElementById('fm_update_start');
         var version = document.getElementById('fm_about_version');
@@ -39,10 +39,12 @@
                 if (epoch !== HF.state.update_epoch) {
                     return;
                 }
-                var data = (res && res.code === 0 && res.data) || {};
+                if (!res || res.code !== 0) { latest.textContent = HF.labels.update_check_failed; return; }
+                var data = res.data || {};
                 version.textContent = 'v' + (data.current || '-');
                 if (!data.fetcher) {
                     latest.textContent = HF.labels.update_no_tool;
+                    if (interactive === true && data.fetcher === false) HF.ensure_dependency('curl', {}, { on_success: function() { if (epoch === HF.state.update_epoch) HF.check_update(); } });
                     return;
                 }
                 var from_mirror = data.mirror ? ' · ' + data.mirror : '';
@@ -155,7 +157,9 @@
         });
     };
 
-    HF.start_update = function start_update() {
+    HF.start_update = function start_update(retried) {
+        var job = HF.state.install_job;
+        if (job && (!job.data.done || job.data.state === 'missing')) { HF.show_package_install(job); return; }
         HF.close_modal();
         HF.state.install_item = { name: 'Harbor File Pro', ext: 'repository' };
         HF.update_package_install_view({
@@ -171,7 +175,7 @@
             if (data && data.task_id) {
                 HF.poll_update_status(data.task_id);
             }
-        }, function(message) {
+        }, function(message, res) {
             HF.set_install_progress(false, 0);
             HF.update_package_install_view({
                 done: true,
@@ -180,10 +184,26 @@
                 package_type: 'repository',
                 installer: 'update'
             });
-        });
+            if (!retried && res && res.data && res.data.dependency_preflight && res.data.missing_tool === 'curl') {
+                HF.ensure_dependency('curl', {}, { evidence: res.data, on_success: function() { HF.start_update(true); } });
+            }
+        }, { quietError: true });
     };
 
-    HF.prism_request = function prism_request(action, data) {
+    function ensureUpdateTools(names, attempted) {
+        if (!Array.isArray(names) || !names.length || names.some(function(name) { return ['curl', 'ucode', 'sha256sum'].indexOf(name) < 0 || attempted.has(name); })) return Promise.resolve(false);
+        return names.reduce(function(pending, name) {
+            return pending.then(function(ready) {
+                if (!ready) return false;
+                attempted.add(name);
+                return HF.ensure_dependency(name, {});
+            });
+        }, Promise.resolve(true));
+    }
+
+    HF.prism_request = function prism_request(action, data, attempted) {
+        data = Object.assign({}, data);
+        attempted = attempted || new Set();
         return new Promise(function(resolve, reject) {
             var url = HF.api['update_' + action];
             if (!url) { reject(new Error(HF.labels.request_failed)); return; }
@@ -193,9 +213,18 @@
                 data: Object.assign({ component: 'prism' }, data || {}),
                 success: function(res) {
                     if (res && res.code === 0) resolve(res.data || {});
-                    else reject(new Error(res && res.message || HF.labels.request_failed));
+                    else { var error = new Error(res && res.message || HF.labels.request_failed); error.data = res && res.data; reject(error); }
                 },
                 error: function(xhr) { reject(new Error(HF.upload_error_message(xhr, HF.labels.request_failed))); }
+            });
+        }).then(function(value) {
+            if (action !== 'check' || !value.tools || !Array.isArray(value.tools.missing) || !value.tools.missing.length) return value;
+            return ensureUpdateTools(value.tools.missing, attempted).then(function(ready) { return ready ? HF.prism_request(action, data, attempted) : value; });
+        }, function(error) {
+            if (action !== 'start' || !error.data || !Array.isArray(error.data.missing_tools)) throw error;
+            return ensureUpdateTools(error.data.missing_tools, attempted).then(function(ready) {
+                if (!ready) throw error;
+                return HF.prism_request(action, data, attempted);
             });
         });
     };

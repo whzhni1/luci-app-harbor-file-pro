@@ -130,24 +130,17 @@
         install_poll_timer: null,
         install_item: null,
         install_task: null,
+        install_job: null,
+        thumbnail_task: null,
+        thumbnail_poll_timer: null,
         archive_poll_timer: null,
         archive_items: [],
         archive_task: null,
-        nginx_installing: false,
-        nginx_install_task: null,
         nginx_install_countdown_timer: null,
-        thumbnail_poll_timer: null,
-        thumbnail_task: null,
-        thumbnail_path: '',
-        terminal_context: null,
-        terminal_info: null,
         detected_types: {},
         detect_waiters: {},
         last_directory_sent: '',
         last_directory_timer: null,
-        terminal_check_timer: null,
-        terminal_url: '',
-        terminal_ready: false,
         drag_item: null,
         drag_items: [],
         uploaded_bytes: 0,
@@ -162,9 +155,9 @@
     };
 
     HF.request_json = function request_json(url, data, on_ok, on_error) {
-        function fail_hard(message) {
+        function fail_hard(message, res) {
             if (on_error) {
-                on_error(message);
+                on_error(message, res);
                 return;
             }
             HF.set_error_status(message || HF.labels.request_failed);
@@ -176,13 +169,14 @@
             dataType: 'json',
             success: function(res) {
                 if (!res || res.code !== 0) {
-                    fail_hard(res && res.message ? res.message : HF.labels.request_failed);
+                    fail_hard(res && res.message ? res.message : HF.labels.request_failed, res);
                     return;
                 }
                 on_ok(res.data || {});
             },
             error: function(xhr) {
-                fail_hard(HF.labels.request_failed + ': HTTP ' + xhr.status);
+                var res = HF.response_json(xhr);
+                fail_hard(res && res.message || HF.labels.request_failed + ': HTTP ' + xhr.status, res);
             }
         });
     }
@@ -328,7 +322,7 @@
                 if (!res || res.code !== 0) {
                     if (!request_options || !request_options.quietError) HF.set_error_status((res && res.message) || HF.labels.operation_failed);
                     if (on_error) {
-                        on_error((res && res.message) || HF.labels.operation_failed);
+                        on_error((res && res.message) || HF.labels.operation_failed, res);
                     }
                     return;
                 }
@@ -341,7 +335,7 @@
                 var message = HF.upload_error_message(xhr, HF.labels.operation_failed);
                 if (!request_options || !request_options.quietError) HF.set_error_status(message);
                 if (on_error) {
-                    on_error(message);
+                    on_error(message, HF.response_json(xhr));
                 }
             }
         });
@@ -359,8 +353,18 @@
         return message;
     }
 
-    HF.request_archive_write = function request_archive_write(url, data, on_ok, on_error) {
+    HF.request_archive_write = function request_archive_write(url, data, on_ok, on_error, attempted) {
+        data = Object.assign({}, data);
+        attempted = attempted || new Set();
         function handle_error(res) {
+            if (res && res.data && res.data.missing_tool) {
+                var tool = res.data.missing_tool;
+                res.data.dependency_attempted = attempted.has(tool);
+                res.data.remote_retry = function() {
+                    attempted.add(tool);
+                    HF.request_archive_write(url, data, on_ok, on_error, attempted);
+                };
+            }
             if (typeof on_error === 'function') {
                 on_error(res);
             } else {

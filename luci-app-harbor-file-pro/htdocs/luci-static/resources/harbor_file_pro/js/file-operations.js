@@ -274,13 +274,6 @@
         if (command_line && log_text.indexOf(command_line) < 0)
             log_text = log_text ? command_line + '\n' + log_text : command_line;
         find('fm_archive_task_log').textContent = log_text || HF.labels.no_log_yet;
-        var install_button = find('fm_archive_install_tool');
-        if (install_button) {
-            install_button.style.display = tool_missing ? '' : 'none';
-            if (tool_missing) {
-                install_button.textContent = HF.format_label(HF.labels.install_tool, tool);
-            }
-        }
         find('fm_archive_task_close').disabled = !task.done && !tool_missing;
         find('fm_archive_task_done').disabled = !task.done && !tool_missing;
     }
@@ -362,66 +355,11 @@
     }
 
     
-    HF.show_archive_missing_tool = function show_archive_missing_tool(res, mode) {
+    HF.show_archive_missing_tool = function show_archive_missing_tool(res, mode, retry) {
         var data = (res && res.data) || {};
-        var tool = data.missing_tool || '';
-        HF.state.archive_missing_tool = data;
-        HF.update_archive_task_view({
-            done: true,
-            success: false,
-            mode: mode,
-            missing_tool: tool,
-            format: tool,
-            message: (res && res.message) || HF.labels.archive_command_missing,
-            log: HF.format_label(HF.labels.archive_tool_required, tool)
-        });
-        HF.open_modal('fm_archive_task_dialog');
+        if (!data.missing_tool || data.dependency_attempted) return HF.set_error_status(HF.archive_error_message(res, HF.labels.archive_command_missing));
+        return HF.ensure_dependency(data.missing_tool, data, { evidence: data, on_success: retry || data.remote_retry });
     };
-
-    HF.start_archive_tool_install = function start_archive_tool_install() {
-        var data = HF.state.archive_missing_tool || {};
-        var tool = data.missing_tool || '';
-        var package_name = data.package_name || tool;
-        if (!tool) {
-            return;
-        }
-        HF.close_modal();
-        HF.state.install_item = { name: package_name, path: package_name, ext: 'repository' };
-        HF.update_package_install_view({
-            state: 'running',
-            done: false,
-            success: false,
-            message: HF.labels.install_running,
-            package_type: 'repository',
-            package_name: package_name,
-            path: package_name,
-            log: HF.labels.no_log_yet
-        });
-        HF.open_modal('fm_package_install_dialog');
-        HF.request_write(HF.api.tool_install_start, { tool: tool }, '', function(data2) {
-            HF.state.install_item = {
-                name: data2.package_name || package_name,
-                path: data2.package_name || package_name,
-                ext: 'repository'
-            };
-            HF.update_package_install_view(data2 || {});
-            HF.open_modal('fm_package_install_dialog');
-            if (data2.task_id && !data2.done) {
-                HF.poll_package_install(data2.task_id);
-            }
-        }, function(message) {
-            HF.update_package_install_view({
-                state: 'failed',
-                done: true,
-                success: false,
-                message: message || HF.labels.install_failed,
-                package_type: 'repository',
-                package_name: package_name,
-                path: package_name,
-                log: HF.labels.no_log_yet
-            });
-        });
-    }
 
     HF.submit_archive_dialog = function submit_archive_dialog() {
         var items = HF.normalize_item_list(HF.state.archive_items || []);
@@ -751,8 +689,14 @@
             HF.state.extract_truncated = !!data.truncated;
             HF.set_extract_hint(data.truncated ? HF.format_label(HF.labels.extract_truncated, (data.entries || []).length) : '');
             HF.set_extract_rows(data.entries || []);
-        }, function(message) {
+        }, function(message, res) {
             if (HF.state.extract_item !== item) return;
+            if (res && res.data && res.data.missing_tool) {
+                var attempted = !!item._hf_archive_dependency;
+                var original = Object.assign({}, item, { _hf_archive_dependency: true });
+                res.data.dependency_attempted = attempted;
+                HF.show_archive_missing_tool(res, 'extract', function() { if (HF.state.extract_item === item) HF.start_archive_extract(original); });
+            }
             HF.state.extract_truncated = false;
             HF.set_extract_rows([]);
             HF.set_extract_hint(HF.labels.extract_list_failed + (message ? ': ' + message : ''));
@@ -975,6 +919,7 @@
         if (data && data.web_server) {
             HF.state.preferences.web_server = String(data.web_server);
         }
+        if (data && data.nginx_available !== undefined) HF.state.preferences.nginx_available = !!data.nginx_available;
         if (data && data.nginx_running !== undefined) {
             HF.state.preferences.nginx_running = data.nginx_running === true || Number(data.nginx_running) === 1;
         }
@@ -5107,53 +5052,159 @@
     HF.update_package_install_view = function update_package_install_view(data) {
         var task = data || {};
         HF.state.install_task = task;
-        var fields = HF.package_install_fields(task, HF.state.install_item);
+        var job = HF.state.install_job;
+        var fields = HF.package_install_fields(task, job ? job.item : HF.state.install_item);
+        if (job) fields.title = (HF.remote_device_name ? HF.remote_device_name(job.owner.device_id) : job.owner.device_id || HF.labels.this_pc) + ' · ' + (task.state === 'missing' ? HF.labels.install : fields.title);
+        document.getElementById('fm_package_install_start').style.display = task.state === 'missing' ? '' : 'none';
         Object.keys(fields).forEach(function(key) { document.getElementById('fm_package_install_' + key).textContent = fields[key]; });
         document.getElementById('fm_package_install_close').disabled = !task.done;
         document.getElementById('fm_package_install_done').disabled = !task.done;
     }
 
-    HF.poll_package_install = function poll_package_install(task_id) {
-        HF.stop_install_poll();
-        HF.Util.ajax({
-            url: HF.api.package_install_status,
-            type: 'GET',
-            data: { task_id: task_id },
-            dataType: 'json',
-            success: function(res) {
-                if (!res || res.code !== 0) {
-                    HF.report_task_poll_error('install_task', HF.update_package_install_view, res, null, function() {
-                        HF.poll_package_install(task_id);
-                    });
-                    return;
-                }
-                HF.update_package_install_view(res.data || {});
-                if (HF.state.install_task && !HF.state.install_task.done) {
-                    HF.state.install_poll_timer = setTimeout(function() {
-                        HF.poll_package_install(task_id);
-                    }, 1000);
-                    return;
-                }
-                if (HF.state.install_task && HF.state.install_task.done) {
-                }
-            },
-            error: function(xhr) {
-                HF.report_task_poll_error('install_task', HF.update_package_install_view, null, xhr, function() {
-                    HF.poll_package_install(task_id);
+    HF.show_package_install = function(job) {
+        var current = HF.state.install_job;
+        if (current && current !== job && (!current.data.done || current.data.state === 'missing')) {
+            HF.window_manager.restore(current.record);
+            return false;
+        }
+        if (current && current !== job && current.options.on_close) current.options.on_close();
+        HF.state.install_job = job;
+        HF.state.install_item = job.item;
+        HF.update_package_install_view(job.data);
+        HF.open_modal('fm_package_install_dialog');
+        job.record = document.getElementById('fm_package_install_dialog')._fmWindow;
+        job.record.options.keepOnModalClose = true;
+        job.record.before_close = function() { return !!job.data.done; };
+        job.record.on_close = function() {
+            if (job.data.state === 'missing') {
+                job.data.state = 'cancelled';
+                job.finish(false);
+            }
+            if (job.options.on_close) job.options.on_close();
+            if (HF.state.install_job === job) {
+                HF.stop_install_poll();
+                HF.state.install_job = null;
+                HF.state.install_item = null;
+                HF.state.install_task = null;
+            }
+        };
+        return true;
+    };
+
+    var dependencyRequests = new Map();
+    HF.ensure_dependency = function(name, target, options) {
+        options = options || {};
+        var owner = HF.file_context(target || {}), key = JSON.stringify([owner.device_id, owner.device_revision, name]);
+        var pending = dependencyRequests.get(key);
+        if (!pending) {
+            var checking = owner.device_id && !options.evidence ?
+                HF.require_remote_request('dependency', Object.assign({ tool: name }, owner)).then(function(info) { return HF.check_dependency(name, owner, info); }) :
+                HF.check_dependency(name, owner, options.evidence);
+            pending = checking.then(function(info) {
+                if (info.available) return { ready: true, data: info };
+                var prepared = owner.device_id && info.tool !== 'stat' && info.tool !== 'ucode' ? HF.ensure_remote_files(owner) : Promise.resolve();
+                return prepared.then(function() {
+                    var settings = Object.assign({ offer: true }, options, {
+                        owner: owner, name: info.package_name, tool: info.tool, on_success: null, on_error: null,
+                        verify: function() { return HF.check_dependency(info.tool, owner); }
+                    }, HF.dependency_install_options(info, owner));
+                    var job = HF.install_plugin(settings);
+                    if (job && options.on_open) options.on_open(job);
+                    return job ? job.completion.then(function(ready) { return { ready: ready, data: job.data, job: job }; }) : { ready: false };
+                });
+            }).catch(function(error) {
+                HF.set_error_status(error.message || HF.labels.request_failed);
+                return { ready: false, data: error };
+            }).finally(function() { dependencyRequests.delete(key); });
+            dependencyRequests.set(key, pending);
+        }
+        return pending.then(function(result) {
+            var callback = result.ready ? options.on_success : options.on_error;
+            return Promise.resolve(callback ? callback(result.data, result.job) : result.ready).then(function(value) { return result.ready && value !== false; });
+        });
+    };
+
+    HF.install_plugin = function(options) {
+        var owner = HF.file_context(options.owner || {});
+        var name = options.name || options.tool || options.item && options.item.name;
+        var job = { owner: owner, options: options, item: options.item || { name: name, path: name, ext: 'repository' }, data: {
+            done: true, success: false, state: 'missing', package_name: name, package_type: options.item ? options.item.ext : 'repository',
+            path: options.item ? options.item.path : name, message: options.message || HF.format_label(HF.tr('%s is not installed'), name)
+        } };
+        job.completion = new Promise(function(resolve) { job.resolve = resolve; });
+        job.finish = function(success) {
+            if (job.finished) return;
+            job.finished = true;
+            var callback = success ? options.on_success : options.on_error;
+            var result = callback ? callback(job.data, job) : success;
+            Promise.resolve(result).then(function(value) { job.resolve(success && value !== false); }, function() { job.resolve(false); });
+        };
+        job.update = function(data, verified) {
+            job.data = Object.assign({}, job.data, { message: '' }, data);
+            if (job.data.done && job.data.success && options.verify && !verified) {
+                job.checking = true;
+                job.data.done = false; job.data.state = 'checking'; job.data.message = HF.labels.checking;
+                Promise.resolve().then(options.verify).then(function(info) {
+                    job.checking = false;
+                    job.update({ done: true, success: !!info.available, state: info.available ? 'success' : 'failed',
+                        message: info.available ? HF.labels.install_success : HF.format_label(HF.tr('%s is not installed'), info.package_name || name) }, true);
+                }, function(error) {
+                    job.checking = false;
+                    job.update({ done: true, success: false, state: 'unknown', message: error.message || HF.labels.task_status_unknown }, true);
                 });
             }
-        });
-    }
+            if (HF.state.install_job === job) HF.update_package_install_view(job.data);
+            if (job.data.done) job.finish(!!job.data.success && job.data.state !== 'unknown');
+        };
+        job.start = function() {
+            if (job.data.state !== 'missing') return;
+            job.data = Object.assign({}, job.data, { done: false, state: 'running', message: HF.labels.install_running });
+            HF.update_package_install_view(job.data);
+            if (options.on_start) options.on_start(job);
+            function started(data) {
+                job.update(data);
+                if (!job.data.done && !job.checking && job.data.task_id) HF.poll_package_install(job.data.task_id);
+                else if (!job.data.done && !job.checking) failed(new Error(HF.labels.task_status_unknown));
+            }
+            function failed(error) {
+                job.update({ done: true, success: false, state: error && error.uncertain ? 'unknown' : 'failed', message: error && error.message || error || HF.labels.install_failed });
+            }
+            if (options.start) options.start(started, failed);
+            else HF.request_write(HF.file_endpoint(options.action || 'tool_install_start', owner), options.params || { tool: options.tool }, '', started, failed, { quietError: true });
+        };
+        if (!HF.show_package_install(job)) { job.finish(false); return null; }
+        if (!options.offer) job.start();
+        return job;
+    };
+
+    HF.poll_package_install = function(task_id) {
+        HF.stop_install_poll();
+        var job = HF.state.install_job;
+        if (!job || job.data.done) return;
+        function received(data) {
+            if (HF.state.install_job !== job) return;
+            job.failures = 0;
+            job.update(data);
+            if (!job.data.done && !job.checking) HF.state.install_poll_timer = setTimeout(function() { HF.poll_package_install(task_id); }, 1000);
+        }
+        function failed(error) {
+            if (HF.state.install_job !== job) return;
+            job.failures = (job.failures || 0) + 1;
+            job.data.message = HF.format_label(HF.labels.task_status_retry, job.failures) + ': ' + (error && error.message || error);
+            if (job.failures >= 30) job.update({ done: true, success: false, state: 'unknown', message: HF.labels.task_status_unknown });
+            else {
+                HF.update_package_install_view(job.data);
+                HF.state.install_poll_timer = setTimeout(function() { HF.poll_package_install(task_id); }, 2000);
+            }
+        }
+        if (job.options.status) job.options.status(task_id, received, failed);
+        else HF.request_json(HF.file_endpoint('package_install_status', job.owner), { task_id: task_id }, received, failed);
+    };
 
     HF.start_package_install = function start_package_install(item) {
-        HF.request_write(HF.api.package_install_start, { path: item.path }, '', function(data) {
-            HF.close_modal();
-            HF.state.install_item = item;
-            HF.update_package_install_view(data || {});
-            HF.open_modal('fm_package_install_dialog');
-            HF.poll_package_install(data.task_id);
-        });
-    }
+        HF.close_file_dialog('fm_package_confirm_dialog');
+        return HF.install_plugin({ owner: item, item: item, action: 'package_install_start', params: { path: item.path } });
+    };
 
     HF.open_package_confirm = function open_package_confirm(item) {
         HF.state.install_item = item;
@@ -5164,12 +5215,65 @@
         HF.open_modal('fm_package_confirm_dialog');
     }
 
-    HF.stop_thumbnail_poll = function stop_thumbnail_poll() {
-        if (HF.state.thumbnail_poll_timer) {
-            clearTimeout(HF.state.thumbnail_poll_timer);
-            HF.state.thumbnail_poll_timer = null;
+    HF.remote_archive_job = function(data) {
+        var owner = HF.file_context(data), job = { data: data };
+        var panel = HF.Util.createElement('div', 'fm-archive-task-panel');
+        var body = document.querySelector('#fm_archive_task_dialog .fm-package-install-body').cloneNode(true), fields = Object.create(null);
+        body.querySelectorAll('[id]').forEach(function(node) { fields[node.id] = node; node.removeAttribute('id'); });
+        panel.appendChild(body);
+        var actions = HF.Util.createElement('div', 'fm-dialog-actions');
+        var close = HF.Util.createElement('button', 'fm-dialog-action', HF.labels.close);
+        close.type = 'button'; close.addEventListener('click', function() { HF.window_manager.close(job.record); });
+        actions.appendChild(close); panel.appendChild(actions);
+        job.record = HF.window_manager.create({ icon: 'file', className: 'fm-remote-file-job', content: panel, minWidth: 390, minHeight: 270,
+            beforeClose: function() { return !!job.data.done || !!job.data.missing_tool; } });
+        function paint() {
+            HF.paint_archive_task(job.data, function(id) {
+                if (id === 'fm_archive_task_title') return job.record.title_node;
+                if (id === 'fm_archive_task_close' || id === 'fm_archive_task_done') return close;
+                return fields[id];
+            });
+            job.record.title_node.textContent = HF.remote_device_name(owner.device_id) + ' · ' + job.record.title_node.textContent;
+            HF.window_manager.render_taskbar();
         }
-    }
+        function poll() {
+            HF.request_json(HF.file_endpoint('archive_status', owner), { task_id: job.data.task_id }, function(value) {
+                job.failures = 0; job.data = Object.assign({}, value, owner); paint();
+                if (!job.data.done) setTimeout(poll, 1000);
+                else if (job.data.success && HF.file_context().device_id === owner.device_id) HF.refresh_current();
+            }, function(message) {
+                job.failures = (job.failures || 0) + 1;
+                job.data.message = HF.format_label(HF.labels.task_status_retry, job.failures) + ': ' + message;
+                if (job.failures >= 30) { job.data.done = true; job.data.success = false; job.data.state = 'unknown'; job.data.message = HF.labels.task_status_unknown; }
+                paint(); if (!job.data.done) setTimeout(poll, 2000);
+            });
+        }
+        paint(); if (data.task_id && !data.done) poll();
+        return job;
+    };
+
+    HF.stop_thumbnail_poll = function() {
+        if (HF.state.thumbnail_poll_timer) clearTimeout(HF.state.thumbnail_poll_timer);
+        HF.state.thumbnail_poll_timer = null;
+    };
+
+    HF.update_thumbnail_view = function(data) {
+        HF.state.thumbnail_task = data || {};
+        HF.paint_thumbnail_task(data, function(id) { return document.getElementById(id); });
+    };
+
+    HF.poll_thumbnail_generation = function(task_id, owner) {
+        HF.stop_thumbnail_poll();
+        HF.request_json(HF.file_endpoint('thumbnail_generate_status', owner), { task_id: task_id }, function(data) {
+            HF.update_thumbnail_view(Object.assign({}, data, owner));
+            if (!data.done) HF.state.thumbnail_poll_timer = setTimeout(function() { HF.poll_thumbnail_generation(task_id, owner); }, 1000);
+            else if (data.success && HF.file_context().device_id === owner.device_id && HF.file_context().path === owner.path) HF.refresh_current();
+        }, function(message) {
+            HF.report_task_poll_error('thumbnail_task', HF.update_thumbnail_view, { message: message }, null, function() {
+                HF.state.thumbnail_poll_timer = setTimeout(function() { HF.poll_thumbnail_generation(task_id, owner); }, 2000);
+            });
+        });
+    };
 
     HF.paint_thumbnail_task = function paint_thumbnail_task(data, find) {
         var task = data || {};
@@ -5190,150 +5294,53 @@
         find('fm_thumbnail_failed').textContent = String(task.failed_count || 0);
         find('fm_thumbnail_log').textContent = task.log || HF.labels.no_log_yet;
         find('fm_thumbnail_install_tool').style.display = tool_missing ? '' : 'none';
-        find('fm_thumbnail_close').disabled = !task.done && !tool_missing;
-        find('fm_thumbnail_done').disabled = !task.done && !tool_missing;
+        find('fm_thumbnail_install_tool').disabled = !!task.installing;
+        find('fm_thumbnail_close').disabled = !!task.installing || !task.done && !tool_missing;
+        find('fm_thumbnail_done').disabled = !!task.installing || !task.done && !tool_missing;
     }
 
-    HF.update_thumbnail_view = function(data) {
-        HF.state.thumbnail_task = data || {};
-        HF.paint_thumbnail_task(data, function(id) { return document.getElementById(id); });
+    HF.start_thumbnail_generation = function start_thumbnail_generation(path, owner, retried) {
+        if (HF.state.thumbnail_task && (!HF.state.thumbnail_task.done || HF.state.thumbnail_task.installing)) { HF.open_modal('fm_thumbnail_dialog'); return; }
+        owner = HF.file_context(owner); owner.path = path;
+        HF.state.thumbnail_task = { done: false };
+        function show(data) {
+            HF.update_thumbnail_view(Object.assign({}, data, owner));
+            HF.open_modal('fm_thumbnail_dialog');
+            var record = document.getElementById('fm_thumbnail_dialog')._fmWindow;
+            record.options.keepOnModalClose = true;
+            record.before_close = function() { return !HF.state.thumbnail_task || !!HF.state.thumbnail_task.done && !HF.state.thumbnail_task.installing; };
+            record.on_close = function() { HF.stop_thumbnail_poll(); HF.state.thumbnail_task = null; };
+            if (data.task_id && !data.done) HF.poll_thumbnail_generation(data.task_id, owner);
+        }
+        HF.request_archive_write(HF.file_endpoint('thumbnail_generate_start', owner), { path: path }, show, function(res) {
+            var data = res && res.data || {};
+            if (data.missing_tool === 'gm') {
+                show(Object.assign({}, data, { done: true, success: false, dependency_missing: true,
+                    package_name: data.package_name || 'graphicsmagick', message: HF.labels.thumbnail_command_missing, log: HF.labels.thumbnail_tool_required }));
+                if (!retried) HF.start_thumbnail_tool_install(true);
+                return;
+            }
+            HF.state.thumbnail_task = null;
+            HF.set_error_status(HF.archive_error_message(res, HF.labels.thumbnail_failed));
+        });
     };
 
-    HF.poll_thumbnail_generation = function poll_thumbnail_generation(task_id) {
-        HF.stop_thumbnail_poll();
-        HF.Util.ajax({
-            url: HF.api.thumbnail_generate_status,
-            type: 'GET',
-            data: { task_id: task_id },
-            dataType: 'json',
-            success: function(res) {
-                if (!res || res.code !== 0) {
-                    HF.report_task_poll_error('thumbnail_task', HF.update_thumbnail_view, res, null, function() {
-                        HF.poll_thumbnail_generation(task_id);
-                    });
-                    return;
-                }
-                HF.update_thumbnail_view(res.data || {});
-                if (HF.state.thumbnail_task && !HF.state.thumbnail_task.done) {
-                    HF.state.thumbnail_poll_timer = setTimeout(function() {
-                        HF.poll_thumbnail_generation(task_id);
-                    }, 1000);
-                    return;
-                }
-                if (HF.state.thumbnail_task && HF.state.thumbnail_task.done) {
-                    if (HF.state.current && HF.state.current.kind === 'directory' && HF.state.current.path === HF.state.thumbnail_task.path) {
-                        HF.refresh_current();
-                    }
-                }
-            },
-            error: function(xhr) {
-                HF.report_task_poll_error('thumbnail_task', HF.update_thumbnail_view, null, xhr, function() {
-                    HF.poll_thumbnail_generation(task_id);
-                });
-            }
-        });
-    }
+    HF.start_thumbnail_tool_install = function(offer) {
+        var task = HF.state.thumbnail_task;
+        if (!task || task.missing_tool !== 'gm' || task.installing) return;
+        var owner = HF.file_context(task);
+        function ready() { task.installing = false; if (HF.state.thumbnail_task === task) HF.update_thumbnail_view(task); }
+        task.installing = true; HF.update_thumbnail_view(task);
+        return HF.ensure_dependency('gm', owner, { evidence: task, offer: offer === true, on_error: ready, on_success: function() {
+            ready();
+            HF.close_file_dialog('fm_thumbnail_dialog');
+            HF.start_thumbnail_generation(owner.path, owner, true);
+        } });
+    };
 
-    HF.start_thumbnail_generation = function start_thumbnail_generation(path) {
-        HF.Util.ajax({
-            url: HF.api.thumbnail_generate_start,
-            type: 'POST',
-            data: { path: path },
-            dataType: 'json',
-            success: function(res) {
-                if (!res || res.code !== 0) {
-                    HF.set_error_status((res && res.message) || HF.labels.thumbnail_failed);
-                    return;
-                }
-                var data = res.data || {};
-                HF.state.thumbnail_path = path;
-                HF.update_thumbnail_view(data);
-                HF.open_modal('fm_thumbnail_dialog');
-                HF.poll_thumbnail_generation(data.task_id);
-            },
-            error: function(xhr) {
-                var res = HF.response_json(xhr);
-                var data = res.data || {};
-                if (res.code === 2 && data.missing_tool === 'gm') {
-                    HF.state.thumbnail_path = path;
-                    HF.update_thumbnail_view({
-                        done: true,
-                        success: false,
-                        dependency_missing: true,
-                        missing_tool: 'gm',
-                        package_name: data.package_name || 'graphicsmagick',
-                        installer: data.installer || '',
-                        path: path,
-                        message: res.message || HF.labels.thumbnail_command_missing,
-                        log: HF.labels.thumbnail_tool_required
-                    });
-                    HF.open_modal('fm_thumbnail_dialog');
-                    return;
-                }
-                HF.set_error_status(HF.upload_error_message(xhr, HF.labels.thumbnail_failed));
-            }
-        });
-    }
-
-    HF.start_thumbnail_tool_install = function start_thumbnail_tool_install() {
-        HF.request_write(HF.api.thumbnail_tool_install_start, {}, '', function(data) {
-            HF.close_modal();
-            HF.state.install_item = {
-                name: data.package_name || 'graphicsmagick',
-                path: data.package_name || 'graphicsmagick',
-                ext: 'repository'
-            };
-            HF.update_package_install_view(data || {});
-            HF.open_modal('fm_package_install_dialog');
-            if (data.task_id && !data.done) {
-                HF.poll_package_install(data.task_id);
-            }
-        });
-    }
-
-    HF.start_terminal_tool_install = function start_terminal_tool_install() {
-        HF.close_modal();
-        HF.state.install_item = {
-            name: 'ttyd',
-            path: 'ttyd',
-            ext: 'repository'
-        };
-        HF.update_package_install_view({
-            state: 'running',
-            done: false,
-            success: false,
-            message: HF.labels.install_running,
-            package_type: 'repository',
-            package_name: 'ttyd',
-            path: 'ttyd',
-            log: HF.labels.no_log_yet
-        });
-        HF.open_modal('fm_package_install_dialog');
-        HF.request_write(HF.api.terminal_tool_install_start, {}, '', function(data) {
-            HF.state.install_item = {
-                name: data.package_name || 'ttyd',
-                path: data.package_name || 'ttyd',
-                ext: 'repository'
-            };
-            HF.update_package_install_view(data || {});
-            HF.open_modal('fm_package_install_dialog');
-            if (data.task_id && !data.done) {
-                HF.poll_package_install(data.task_id);
-            }
-        }, function(message) {
-            HF.update_package_install_view({
-                state: 'failed',
-                done: true,
-                success: false,
-                message: message || HF.labels.install_failed,
-                package_type: 'repository',
-                package_name: 'ttyd',
-                path: 'ttyd',
-                exit_code: -1,
-                log: message || HF.labels.install_failed
-            });
-        });
-    }
+    HF.start_terminal_tool_install = function(on_ready, on_failed, owner, evidence, offer) {
+        return HF.ensure_dependency('ttyd', owner || {}, { evidence: evidence, offer: offer === true, on_success: on_ready, on_error: on_failed });
+    };
 
     HF.remember_open_type = function remember_open_type(item, open_type) {
         if (!item || !item.path) return;

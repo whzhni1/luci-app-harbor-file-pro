@@ -989,8 +989,8 @@ msgstr "目标压缩包已存在，是否覆盖？"
 msgid "The terminal uses a certificate the browser cannot verify (for example a self-signed certificate), so it is blocked inside this window. Open the terminal in a new window and accept the certificate, or install a trusted certificate for ttyd"
 msgstr "终端使用了浏览器无法验证的证书（例如自签名证书），因此在此窗口内被阻止。请在新窗口中打开终端并接受该证书，或为 ttyd 安装受信任的证书"
 
-msgid "The ttyd service is not installed or not configured"
-msgstr "ttyd 服务未安装或未配置"
+msgid "No executable ttyd program was found"
+msgstr "未找到可执行的 ttyd 程序"
 
 msgid "The web interface may be interrupted during installation. After installation, the login page will be reopened. If it cannot be accessed, please try again later."
 msgstr "安装过程中 Web 界面可能会中断。安装完成后会重新打开登录页。如果无法访问，请稍后重试。"
@@ -1690,9 +1690,6 @@ msgstr "远端设备没有 opkg 或 apk"
 msgid "Install on remote device"
 msgstr "在远端设备安装"
 
-msgid "Update package indexes and install coreutils-stat on this remote device? Dependencies may also be installed."
-msgstr "是否更新此远端设备的软件包索引并安装 coreutils-stat？可能同时安装其依赖。"
-
 msgid "Installation status is uncertain. Check the remote device before starting another installation."
 msgstr "安装请求结果不确定，请先检查远端设备，不要立即重复安装。"
 
@@ -1745,20 +1742,11 @@ msgstr "显示密码"
 msgid "Hide password"
 msgstr "隐藏密码"
 
-msgid "Install the missing remote file tools (ucode, ucode-mod-fs and ucode-mod-uci) on this device?"
-msgstr "是否在此远端设备安装缺少的文件操作工具（ucode、ucode-mod-fs 和 ucode-mod-uci）？"
-
 msgid "Remote file tools are not ready"
 msgstr "远端文件操作工具尚未就绪"
 
 msgid "The remote operation outcome is unknown. Check the device before retrying; the operation may still be running."
 msgstr "远端操作结果尚不确定。请先检查该设备再重试；操作可能仍在运行。"
-
-msgid "The browser must be able to reach this remote device’s ttyd port. This is not an SSH tunnel; the local terminal will not be used as a fallback."
-msgstr "浏览器必须能够访问该远端设备的 ttyd 端口。这不是 SSH 隧道，连接失败不会改用本机终端。"
-
-msgid "Install ttyd on this remote device? Its package scripts may start a web terminal service. Review the device’s authentication and network access settings."
-msgstr "向该远端设备安装 ttyd？软件包脚本可能启动网页终端服务，请检查该设备的认证和网络访问设置。"
 
 msgid "Glass appearance"
 msgstr "磨砂外观"
@@ -1941,3 +1929,6 @@ msgstr "对目录生效"
 
 msgid "When cleared, only regular files are changed. The selected directory and all subdirectories keep their permissions."
 msgstr "取消勾选后仅修改普通文件，当前目录和所有子目录的权限保持不变。"
+
+msgid "Required archive tool is not installed"
+msgstr "所需的压缩工具未安装"

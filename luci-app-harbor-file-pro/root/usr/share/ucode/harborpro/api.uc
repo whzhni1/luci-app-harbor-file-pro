@@ -78,7 +78,16 @@ const TOOL_PACKAGE_MAP = {
 	ffmpeg:   'ffmpeg',
 	convert:  'imagemagick',
 	gm:       'graphicsmagick',
-	ttyd:     'ttyd'
+	ttyd:     'ttyd',
+	ssh:      'openssh-client',
+	sshpass:  'sshpass',
+	pv:       'pv',
+	stat:     'coreutils-stat',
+	sha256sum: 'coreutils-sha256sum',
+	curl:     'curl',
+	wget:     'wget',
+	nginx:    'nginx-ssl-util luci-nginx',
+	ucode:    'ucode ucode-mod-fs ucode-mod-uci'
 };
 
 const TEXT_EXT_MAP = {
@@ -511,10 +520,21 @@ function mkdir_p(path) {
 }
 
 function have_tool(name) {
-	for (let dir in [ '/bin/', '/usr/bin/', '/sbin/', '/usr/sbin/' ])
-		if (stat(dir + name))
+	for (let dir in [ '/bin/', '/usr/bin/', '/sbin/', '/usr/sbin/' ]) {
+		let st = stat(dir + name);
+		if (st && st.type == 'file' && (st.mode & 0111))
 			return true;
+	}
 	return false;
+}
+
+function dependency_spec(name) {
+	if (type(name) != 'string' || !match(name, /^[A-Za-z0-9._+-]+$/)) return null;
+	for (let tool, packages in TOOL_PACKAGE_MAP) {
+		if (name == tool || index(split(packages, ' '), name) >= 0)
+			return { tool, package_name: packages };
+	}
+	return null;
 }
 
 function shellquote(s) {
@@ -1172,7 +1192,8 @@ function api_preferences() {
 	for (let k, v in detect_web_server())
 		prefs[k] = v;
 
-	prefs.ttyd_available = (stat('/etc/init.d/ttyd') != null);
+	prefs.ttyd_available = have_tool('ttyd');
+	prefs.nginx_available = have_tool('nginx');
 	prefs.fcm = (stat('/etc/fwx_release') != null) ? 1 : 0;
 
 	ok(http, prefs);
@@ -1506,35 +1527,24 @@ function ttyd_config() {
 }
 
 function ttyd_running() {
-	let p = popen("ps ww 2>/dev/null || ps w 2>/dev/null || ps 2>/dev/null", 'r');
-	if (!p)
-		return false;
-
-	let running = false;
-	for (let line = p.read('line'); length(line); line = p.read('line')) {
-		if (match(line, /[\t ]ttyd/) && !match(line, /[\t ]grep[\t ]/)) {
-			running = true;
-			break;
-		}
+	for (let pid in (lsdir('/proc') ?? [])) {
+		if (!match(pid, /^[0-9]+$/)) continue;
+		let executable = readlink('/proc/' + pid + '/exe');
+		if (executable && match(executable, /\/ttyd( \(deleted\))?$/)) return true;
 	}
-	p.close();
-
-	return running;
+	return false;
 }
 
 function api_terminal_info() {
 	let cfg = ttyd_config();
 	let running = ttyd_running();
-	let init_script = stat('/etc/init.d/ttyd');
-	let config_file = stat('/etc/config/ttyd');
-	let executable = have_tool('ttyd');
-	let installed = executable || init_script || config_file || running;
+	let installed = have_tool('ttyd');
 
 	let url_override = cfg.url_override ?? cfg.url ?? cfg.path ?? '';
 	let port = +(cfg.port ?? 0);
 
 	ok(http, {
-		available: installed ? true : false,
+		available: installed || running ? true : false,
 		port: (port == port && port > 0 && port < 65536) ? port : 7681,
 		ssl: (cfg.ssl == '1' || cfg.ssl == 1 || cfg.ssl == 'on' ||
 			cfg.ssl == 'true' || cfg.ssl == true) ? 1 : 0,
@@ -1551,7 +1561,7 @@ function api_terminal_tool_install_start() {
 }
 
 function api_nginx_install_start() {
-	start_install([ 'nginx-ssl-util', 'luci-nginx' ], 'nginx');
+	start_install(split(TOOL_PACKAGE_MAP.nginx, ' '), 'nginx');
 }
 
 function api_thumbnail_tool_install_start() {
@@ -1565,7 +1575,7 @@ function api_tool_install_start() {
 			return fail(http, 1, tr('Invalid tool name'));
 
 		let pkg = TOOL_PACKAGE_MAP[tool] ?? tool;
-		return start_install([ pkg ], tool);
+		return start_install(split(pkg, ' '), tool);
 	}
 
 	let raw = http.formvalue('packages');
@@ -2773,6 +2783,10 @@ function archive_listing(src, ext) {
 	else
 		return { error: tr('Unsupported archive format') };
 
+	let tool = archive_bsdtar_kind(kind) ? 'bsdtar' : 'tar';
+	if (!have_tool(tool))
+		return { error: tr('Required archive tool is not installed'), missing_tool: tool, package_name: TOOL_PACKAGE_MAP[tool] ?? tool };
+
 	if (!ensure_runtime_dir())
 		return { error: tr('List failed'), detail: 'Cannot initialize temporary directory: ' + RUNTIME_DIR };
 	let staging = create_staging_directory(RUNTIME_DIR, '.archive-list.');
@@ -2862,7 +2876,7 @@ function directory_size_page(path) {
 function api_list() {
 	if (http.formvalue('remote_action')) return require('harborpro.remote').dispatch(http, {
 		api_source: () => _fs.readfile(sourcepath()), ensure_runtime_dir, normalize_path, valid_component, join_path, parent_path, file_extension,
-		read_preferences, is_system_path, is_descendant, process_alive, remove_recursive, sort_directory_items, ok, fail, tr, command_exists: have_tool
+		read_preferences, is_system_path, is_descendant, process_alive, remove_recursive, sort_directory_items, ok, fail, tr, dependency_spec, command_exists: have_tool
 	});
 	let path = normalize_path(http.formvalue('path'));
 
@@ -2882,7 +2896,7 @@ function api_list() {
 		let list = archive_listing(path, ext);
 
 		if (list.error)
-			return fail(http, 2, list.error + (list.detail ? ': ' + list.detail : ''), { detail: list.detail ?? '' });
+			return fail(http, 2, list.error + (list.detail ? ': ' + list.detail : ''), { detail: list.detail ?? '', missing_tool: list.missing_tool, package_name: list.package_name });
 
 		return ok(http, { archive: path, entries: list.entries, truncated: list.truncated ?? false });
 	}
@@ -3636,9 +3650,6 @@ function api_archive_create_start() {
 			target_is_directory: (existing.type == 'directory')
 		});
 
-	if (existing && !remove_recursive(target))
-		return fail(http, 6, tr('Cannot replace the existing target'));
-
 	let need_tool = format == 'zip' ? 'bsdtar' : 'tar';
 
 	if (!have_tool(need_tool))
@@ -3646,6 +3657,9 @@ function api_archive_create_start() {
 			missing_tool: need_tool,
 			package_name: TOOL_PACKAGE_MAP[need_tool] ?? need_tool
 		});
+
+	if (existing && !remove_recursive(target))
+		return fail(http, 6, tr('Cannot replace the existing target'));
 
 	let cmd = (format == 'tar')
 		? sprintf('cd %s && tar -cvf %s %s',

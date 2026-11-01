@@ -1000,6 +1000,8 @@
                 return null;
             }
             var record = element._fmWindow;
+            var shared_size = element.getAttribute('data-window-size') === 'shared';
+            var reopening = record && record.closed;
             if (!record) {
                 var header = element.querySelector('.fm-dialog-header');
                 record = this.install_record(element, {
@@ -1007,9 +1009,9 @@
                     displayMode: display_mode || 'flex',
                     icon: 'file',
                     titleNode: header ? header.querySelector('.fm-dialog-title') : null,
-                    minWidth: 260,
-                    minHeight: 140,
-                    persistSize: false
+                    minWidth: shared_size ? 390 : 260,
+                    minHeight: shared_size ? 270 : 140,
+                    persistSize: shared_size
                 });
                 if (header) {
                     header.classList.add('fm-window-titlebar');
@@ -1020,7 +1022,7 @@
             record.display_mode = display_mode || record.display_mode || 'flex';
             record.closed = false;
             record.minimized = false;
-            this.show(record, !record.initialized);
+            this.show(record, !record.initialized || shared_size && reopening && !record.maximized);
             return record;
         };
 
@@ -1082,6 +1084,8 @@
                 button.addEventListener('click', function() {
                     if (record.minimized) {
                         manager.restore(record);
+                    } else if (manager.active === record) {
+                        manager.minimize(record);
                     } else {
                         manager.focus(record);
                     }
@@ -1115,7 +1119,7 @@
             var manager = this;
             var changed = false;
             this.records.forEach(function(record) {
-                if (record.legacy && !record.closed) {
+                if (record.legacy && !record.closed && !record.options.keepOnModalClose) {
                     manager.stop_record_interaction(record);
                     record.closed = true;
                     record.minimized = false;
@@ -1123,7 +1127,7 @@
                     changed = true;
                 }
             });
-            if (this.active && this.active.legacy) {
+            if (this.active && this.active.legacy && this.active.closed) {
                 this.active = null;
             }
             if (changed) {

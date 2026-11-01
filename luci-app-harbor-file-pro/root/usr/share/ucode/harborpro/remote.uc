@@ -8,6 +8,11 @@ let H;
 
 function quote(s) { return "'" + replace('' + s, "'", "'\\''") + "'"; }
 function error(message, data) { die(sprintf('%J', { message, data })); }
+function missing_dependency(tool, d, message) {
+ let spec = H.dependency_spec ? H.dependency_spec(tool) : null;
+ error(message, { missing_tool: tool, package_name: spec?.package_name ?? tool, dependency_preflight: true,
+  stat_missing: tool == 'stat', agent_missing: tool == 'ucode', device_id: d?.id ?? '', device_revision: d?.revision ?? '' });
+}
 function read_json(path) { try { return json(fs.readfile(path)); } catch (e) { return null; } }
 function save_json(path, value) {
 	if (!fs.writefile(path, sprintf('%J', value))) error('Cannot save task state');
@@ -113,7 +118,7 @@ function shell(command, dir, timeout) {
 	return output;
 }
 function client() {
-	if (!H.command_exists('ssh')) error('SSH client is not installed');
+	if (!H.command_exists('ssh')) missing_dependency('ssh', null, 'SSH client is not installed');
 	let proc = fs.popen('ssh -V 2>&1', 'r');
 	let version = proc ? proc.read('all') : '';
 	if (proc) proc.close();
@@ -136,7 +141,7 @@ function ssh_command(d, dir, script, probe) {
 			(probe ? '-o StrictHostKeyChecking=accept-new -o BatchMode=yes' : '-o StrictHostKeyChecking=yes -o NumberOfPasswordPrompts=1 -o PreferredAuthentications=password,keyboard-interactive');
 	let auth = '';
 	if (!probe) {
-		if (!H.command_exists('sshpass')) error('sshpass is not installed');
+		if (!H.command_exists('sshpass')) missing_dependency('sshpass', null, 'sshpass is not installed');
 		if (!fs.writefile(dir + '/password', d.password + '\n')) error('Cannot prepare authentication');
 		fs.chmod(dir + '/password', 0o600);
 		auth = 'sshpass -f ' + quote(dir + '/password') + ' ';
@@ -146,7 +151,11 @@ function ssh_command(d, dir, script, probe) {
 function trusted(d) {
 	if (!d || d.host_key) return;
 	let dir = workspace();
-	try { shell(ssh_command(d, dir, ':', true), dir, 15); } catch (e) {}
+	try { shell(ssh_command(d, dir, ':', true), dir, 15); } catch (e) {
+  let detail;
+  try { detail = json('' + e); } catch (ignored) {}
+  if (detail?.data?.dependency_preflight) { remove_query(dir); die(e); }
+ }
 	let key = fs.readfile(dir + '/.ssh/known_hosts') ?? '';
 	let diagnostic = fs.readfile(dir + '/error') ?? '';
 	cleanup(dir);
@@ -184,7 +193,7 @@ function listing(d, path, capacity) {
 	try { raw = run(d, 'sh -c ' + quote(LIST_SCRIPT) + ' sh ' + quote(path) + ' ' + quote(capacity ? 'capacity' : 'list')); }
 	catch (e) {
 		if (index('' + e, 'stat is required on this device; install coreutils-stat') >= 0)
-			error('coreutils-stat is required to open this device', { stat_missing: true, device_id: d?.id ?? '', device_revision: d?.revision ?? '' });
+			missing_dependency('stat', d, 'coreutils-stat is required to open this device');
 		die(e);
 	}
 	let fields = split(raw, '\x00');
@@ -207,7 +216,7 @@ function listing(d, path, capacity) {
 }
 function parameters(http) {
 	let p = {};
-	for (let k in ['id', 'name', 'host', 'port', 'username', 'password', 'challenge', 'device_id', 'device_revision', 'source_device', 'target_device', 'source_revision', 'target_revision', 'path', 'sources', 'target_dir', 'tree_path', 'suggest_rename', 'rename_map', 'exclude_paths', 'conflict_action', 'preserve_permissions', 'task_id', 'operation', 'rpc_action', 'rpc_data']) p[k] = http.formvalue(k);
+	for (let k in ['id', 'name', 'host', 'port', 'username', 'password', 'challenge', 'device_id', 'device_revision', 'source_device', 'target_device', 'source_revision', 'target_revision', 'path', 'sources', 'target_dir', 'tree_path', 'suggest_rename', 'rename_map', 'exclude_paths', 'conflict_action', 'preserve_permissions', 'task_id', 'operation', 'tool', 'rpc_action', 'rpc_data']) p[k] = http.formvalue(k);
 	return p;
 }
 function same_device(a, b) {
@@ -340,7 +349,7 @@ function transfer_pipeline(source, target, meter_output) {
 	return '{ ' + source + '; echo $? > source.rc; } | { pv -f -n -b -t -i 1 ' + meter_output + '; echo $? > meter.rc; } | { ' + target + '; echo $? > target.rc; }\nfor f in source.rc meter.rc target.rc; do [ "$(cat "$f" 2>/dev/null)" = 0 ] || exit 1; done\n';
 }
 function start(p) {
-	if (!H.command_exists('pv')) error('pv is not installed');
+	if (!H.command_exists('pv')) missing_dependency('pv', null, 'pv is not installed');
 	let q = plan(p);
 	let action = p.conflict_action ?? 'error';
 	if (action != 'overwrite' && action != 'error' && action != 'rename' && action != 'skip') error('Invalid conflict action');
@@ -461,6 +470,25 @@ function authorize_remote(http, action, p) {
  try { result = bus && bus.call('session', 'access', { ubus_rpc_session: sid, scope: 'ubus', object: 'harbor.file', function: writing ? 'write' : 'read' }); } catch (e) {}
  if (result?.access !== true) error('Remote file access denied');
 }
+function dependency_info(p) {
+ let spec = H.dependency_spec(p.tool);
+ if (!spec) error('Invalid tool name');
+ if (!length(p.device_id ?? '') && length(p.device_revision ?? '')) error('Device settings changed; reopen the device');
+ let d = length(p.device_id ?? '') ? agent_device(p) : null;
+ let result;
+ if (spec.tool == 'stat') {
+  let info = tool_info(d);
+  result = { ...info, installed: info.stat, available: info.stat };
+ } else {
+  let script = 'tool=' + quote(spec.tool) + '\n' + "installed=0\navailable=0\nrunning=0\nif command -v \"$tool\" >/dev/null 2>&1; then installed=1; available=1; fi\n";
+  if (spec.tool == 'ucode') script += 'available=0\n[ "$(' + AGENT_TOOLS + ')" != ok ] || available=1\n';
+  script += "if [ \"$tool\" = ttyd ] || [ \"$tool\" = nginx ]; then\n for entry in /proc/[0-9]*/exe; do\n  case \"$(readlink \"$entry\" 2>/dev/null)\" in */\"$tool\"|*/\"$tool\"' (deleted)') running=1;; esac\n done\nfi\n[ \"$tool\" != ttyd ] || [ \"$running\" != 1 ] || available=1\nprintf 'HF_DEPENDENCY %s %s %s\\n' \"$installed\" \"$available\" \"$running\"\n";
+  let values = match(trim(run(d, script)), /^HF_DEPENDENCY ([01]) ([01]) ([01])$/);
+  if (!values) error('Invalid remote tool response');
+  result = { installed: values[1] == '1', available: values[2] == '1', running: values[3] == '1' };
+ }
+ return { ...spec, ...result, device_id: d?.id ?? '', device_revision: d?.revision ?? '' };
+}
 function agent_info(p) {
  let d = agent_device(p);
  let available = trim(run(d, AGENT_TOOLS + ' || true')) == 'ok';
@@ -497,8 +525,8 @@ function agent_prepare(p) {
   if (!match(hash, /^[a-f0-9]{64}$/)) error('Cannot identify remote helper');
   let path = agent_root() + '/' + hash;
   let probe = trim(run(d, STAT_DETECT + 'if [ "$stat_kind" = missing ]; then echo HF_STAT_MISSING; elif [ "$(' + AGENT_TOOLS + ')" != ok ]; then echo HF_AGENT_MISSING; else [ ! -L ' + quote(path) + ' ] && [ -O ' + quote(path + '/ready') + ' ] && cat ' + quote(path + '/ready') + ' || true; fi'));
-  if (probe == 'HF_STAT_MISSING') error('coreutils-stat is required to open this device', { stat_missing: true, device_id: d.id, device_revision: d.revision });
-  if (probe == 'HF_AGENT_MISSING') error('Remote file tools are missing', { agent_missing: true, device_id: d.id, device_revision: d.revision });
+  if (probe == 'HF_STAT_MISSING') missing_dependency('stat', d, 'coreutils-stat is required to open this device');
+  if (probe == 'HF_AGENT_MISSING') missing_dependency('ucode', d, 'Remote file tools are missing');
   if (probe != hash) {
    let stage = agent_root() + '/.' + token();
    let deploy = agent_setup_script() + 'stage=' + quote(stage) + '\nmkdir -m 700 "$stage"\ntrap \'rm -rf "$stage"\' EXIT HUP INT TERM\n';
@@ -690,6 +718,7 @@ function dispatch(http, helpers) {
 			let info = tool_info(null);
 			result = { devices: devices(false), tools: { sshpass: H.command_exists('sshpass'), pv: H.command_exists('pv'), ssh: H.command_exists('ssh'), stat: info.stat, stat_provider: info.stat_provider } };
 		}
+		else if (action == 'dependency') result = dependency_info(p);
 		else if (action == 'tools') {
 			let d = checked_device(p.device_id, p.device_revision);
 			if (!d) error('Device not found');
