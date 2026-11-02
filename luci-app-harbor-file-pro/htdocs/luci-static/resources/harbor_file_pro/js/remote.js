@@ -69,8 +69,9 @@
                     info = Object.assign({}, info, { missing_tool: missing, device_id: info.device_id === undefined ? data.device_id : info.device_id });
                 } else if (info.dependency_preflight !== true) throw error;
                 var tool = info.missing_tool;
-                if (['ssh', 'sshpass', 'pv', 'stat', 'ucode'].indexOf(tool) < 0 || typeof info.device_id !== 'string' || typeof info.device_revision !== 'string') throw error;
+                if (['ssh', 'sshpass', 'pv', 'stat', 'ucode', 'timeout'].indexOf(tool) < 0 || typeof info.device_id !== 'string' || typeof info.device_revision !== 'string') throw error;
                 var owner = HF.file_context(info);
+                if (tool === 'timeout' && owner.device_id) throw error;
                 if (owner.device_id && !owners.some(function(value) { return value.device_id === owner.device_id && value.device_revision === owner.device_revision; }) || !owner.device_id && owner.device_revision) throw error;
                 var key = JSON.stringify([owner.device_id, owner.device_revision, tool]);
                 if (attempted.has(key)) throw error;
@@ -308,8 +309,24 @@
         }
         if (activeDevice() === id && identityChanged || HF.state.current && HF.state.current.kind === 'remote_devices') HF.show_remote_devices(false);
     }
+    function updateDeviceEditor(host) {
+        var disabled = !host._toolsReady || !!host._saving;
+        Object.keys(host._inputs).forEach(function(key) { host._inputs[key].disabled = disabled; });
+        [host._passwordToggle, host._save, host._reset].forEach(function(node) { node.disabled = disabled; });
+        host._dependencyHint.hidden = host._toolsReady === true;
+    }
+    function renderLocalTools(host, tools, checking) {
+        HF.clear_node(host._tools);
+        var names = ['timeout', 'sshpass', 'pv', 'stat']; if (!tools || !tools.ssh) names.push('ssh');
+        names.forEach(function(tool) {
+            var row = toolRow(tool === 'stat' ? 'coreutils-stat' : tool, tools ? toolStatus(tools[tool]) : checking ? HF.labels.checking : label('unknown'), label(tool + '_description'));
+            if (tools && tools[tool] === false) row._actions.appendChild(toolButton(label('install'), function() { installTool(tool); }));
+            host._tools.appendChild(row);
+        });
+    }
     function editDevice(id) {
         var host = document.getElementById('fm_remote_settings');
+        if (!host._toolsReady || host._saving) return;
         var sequence = host._editorSequence = (host._editorSequence || 0) + 1;
         var data = id ? request('get', { id: id }) : Promise.resolve({ id: '', name: '', host: '', port: '', username: '', password: '' });
         data.then(function(d) {
@@ -363,9 +380,15 @@
         var reset = button(label('add'), function() { editDevice(''); });
         var save = button(label('save'), function() {}, true); save.type = 'submit';
         actions.appendChild(reset); actions.appendChild(save); form.appendChild(actions);
+        host._save = save; host._reset = reset;
+        host._dependencyHint = HF.Util.createElement('div', 'fm-remote-status', label('setup_tools_required'));
+        host._dependencyHint.setAttribute('role', 'status');
+        host.appendChild(host._dependencyHint);
         host._message = HF.Util.createElement('div', 'fm-remote-status'); form.appendChild(host._message); host.appendChild(form);
+        updateDeviceEditor(host);
         form.addEventListener('submit', function(event) {
             event.preventDefault();
+            if (!host._toolsReady || host._saving) return;
             Object.keys(host._inputs).forEach(function(key) {
                 var input = host._inputs[key];
                 input.setCustomValidity(input.value.trim() ? '' : label('required'));
@@ -375,13 +398,13 @@
             var values = { id: host._deviceId || '' };
             var previous = devices.get(values.id);
             Object.keys(host._inputs).forEach(function(key) { values[key] = host._inputs[key].value; });
-            save.disabled = true; reset.disabled = true;
+            host._saving = true; updateDeviceEditor(host);
             request('save', values).then(function(data) {
                 if (editSequence === (host._editorSequence || 0)) host._deviceId = data.id;
                 deviceChanged(data.id, !!previous && (previous.host !== values.host.trim() || previous.port !== Number(values.port) || previous.username !== values.username));
                 host._message.textContent = HF.labels.settings_saved;
                 HF.render_remote_settings();
-            }).catch(function(error) { host._message.textContent = error.message; }).finally(function() { save.disabled = false; reset.disabled = false; });
+            }).catch(function(error) { host._message.textContent = error.message; }).finally(function() { host._saving = false; updateDeviceEditor(host); });
         });
     }
     HF.render_remote_settings = function() {
@@ -389,23 +412,25 @@
         if (!host) return;
         buildSettings(host);
         var sequence = ++settingsSequence;
+        host._toolsReady = false; updateDeviceEditor(host);
+        renderLocalTools(host, null, true);
         loadDevices().then(function(data) {
             if (sequence !== settingsSequence) return;
-            HF.clear_node(host._tools); HF.clear_node(host._devices);
-            var names = ['sshpass', 'pv', 'stat']; if (!data.tools.ssh) names.push('ssh');
-            names.forEach(function(tool) {
-                var row = toolRow(tool === 'stat' ? 'coreutils-stat' : tool, toolStatus(data.tools[tool]), label(tool + '_description'));
-                if (!data.tools[tool]) row._actions.appendChild(toolButton(label('install'), function() { installTool(tool); }));
-                host._tools.appendChild(row);
-            });
+            host._toolsReady = ['ssh', 'timeout', 'sshpass', 'pv', 'stat'].every(function(tool) { return data.tools && data.tools[tool] === true; });
+            updateDeviceEditor(host);
+            renderLocalTools(host, data.tools);
+            HF.clear_node(host._devices);
             data.devices.forEach(function(d) {
                 var row = HF.Util.createElement('div', 'fm-settings-row');
                 var copy = HF.Util.createElement('div', 'fm-settings-copy');
                 copy.appendChild(HF.Util.createElement('div', 'fm-settings-label', d.name));
                 copy.appendChild(HF.Util.createElement('div', 'fm-settings-desc', d.username + '@' + d.host + ':' + d.port));
                 row.appendChild(copy);
-                row.appendChild(button(label('edit'), function() { editDevice(d.id); }));
-                row.appendChild(button(label('remove'), function() {
+                var actions = HF.Util.createElement('div', 'fm-nginx-actions');
+                var edit = button(label('edit'), function() { editDevice(d.id); });
+                edit.disabled = !host._toolsReady || !!host._saving;
+                actions.appendChild(edit);
+                actions.appendChild(button(label('remove'), function() {
                     HF.confirm_window({ title: label('remove'), message: label('delete') + '\n' + d.name }).then(function(yes) {
                         if (!yes) return;
                         request('delete', { id: d.id }).then(function() {
@@ -415,6 +440,7 @@
                         }).catch(function(error) { host._message.textContent = error.message; });
                     });
                 }));
+                row.appendChild(actions);
                 var block = HF.Util.createElement('div', 'fm-remote-device');
                 block.appendChild(row);
                 var dependency = toolRow('coreutils-stat · ' + label('remote_side'), label('unchecked'), label('remote_stat_description'));
@@ -422,7 +448,12 @@
                 block.appendChild(dependency); host._devices.appendChild(block);
                 renderDependency(dependency, d);
             });
-        }).catch(function(error) { if (sequence === settingsSequence) host._message.textContent = error.message; });
+        }).catch(function(error) {
+            if (sequence !== settingsSequence) return;
+            host._toolsReady = false; updateDeviceEditor(host);
+            renderLocalTools(host, null, false);
+            host._message.textContent = error.message;
+        });
     };
     function toolButton(text, action) {
         var node = button(text, action); node.className = 'fm-nginx-command primary'; return node;

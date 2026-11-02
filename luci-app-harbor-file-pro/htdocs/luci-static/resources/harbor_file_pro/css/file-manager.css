@@ -1832,6 +1832,7 @@
 }
 
 .fm-settings-body{
+    container-type: inline-size;
     max-height: calc(100vh - 88px);
     overflow-y: auto;
     padding: 16px;
@@ -1912,9 +1913,10 @@
 }
 
 .fm-settings-row{
-    display: flex;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr);
     align-items: center;
-    gap: 18px;
+    gap: 6px 12px;
     min-width: 0;
     padding: 18px 16px;
 }
@@ -1970,9 +1972,21 @@
 
 .fm-nginx-actions{
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
+    justify-content: flex-end;
     gap: 8px;
-    flex: 0 0 auto;
+    min-width: 0;
+    flex: 0 1 auto;
+}
+
+.fm-settings-intro-title > .fm-nginx-actions{
+    max-width: 65%;
+}
+
+.fm-settings-intro-title > strong{
+    min-width: 0;
+    overflow-wrap: anywhere;
 }
 
 .fm-nginx-status{
@@ -2057,8 +2071,28 @@
 
 
 .fm-settings-copy{
+    display: contents;
+}
+
+.fm-settings-copy > .fm-settings-label,
+.fm-settings-row > .fm-settings-label{
+    grid-column: 1;
+    grid-row: 1;
     min-width: 0;
-    flex: 1;
+}
+
+.fm-settings-copy > .fm-settings-desc{
+    grid-column: 1 / -1;
+    margin-top: 0;
+    overflow-wrap: anywhere;
+}
+
+.fm-settings-row > :not(.fm-settings-copy):not(.fm-settings-label){
+    grid-column: 2;
+    grid-row: 1;
+    justify-self: end;
+    min-width: 0;
+    max-width: 100%;
 }
 
 .fm-settings-label{
@@ -2077,14 +2111,15 @@
 }
 
 .fm-settings-control-wrap{
-    flex: 0 0 auto;
+    min-width: 0;
 }
 
 .fm-settings-control{
     box-sizing: border-box;
     display: block;
     width: 172px;
-    min-width: 172px;
+    min-width: 0;
+    max-width: 100%;
     height: 38px;
     padding: 0 34px 0 12px;
     border: 1px solid rgba(31, 41, 55, 0.12);
@@ -2142,12 +2177,10 @@
 
 .fm-settings-path-control{
     width: 260px;
-    min-width: 260px;
 }
 
 .fm-settings-number-control{
     width: 120px;
-    min-width: 120px;
 }
 
 .fm-settings-path-control,
@@ -2164,14 +2197,18 @@
     background-image: none;
 }
 
-.fm-settings-input-group{
+.fm-settings-input-group,
+.fm-settings-control-line{
+    max-width: 100%;
+    min-width: 0;
     display: inline-flex;
     align-items: center;
     gap: 8px;
 }
 
-.fm-settings-input-group .fm-settings-number-control{
-    flex: 0 0 auto;
+.fm-settings-input-group .fm-settings-number-control,
+.fm-settings-control-line .fm-settings-number-control{
+    flex: 0 1 120px;
 }
 
 .fm-settings-unit{
@@ -2205,8 +2242,6 @@
 }
 
 .fm-settings-control-line{
-    display: inline-flex;
-    align-items: center;
     gap: 12px;
 }
 
@@ -2565,26 +2600,9 @@
     .fm-item{ animation: none; }
 }
 
-@media (max-width: 760px) {
-    .file-manager{
-        min-height: 0;
-        border-radius: 6px;
-    }
-
-    .fm-terminal-dialog{
-        width: calc(100vw - 20px);
-        height: calc(100vh - 20px);
-        min-width: 0;
-        min-height: 0;
-        resize: none;
-    }
-
-    .fm-settings-body{
-        padding: 10px;
-    }
-
+@container (max-width: 640px) {
     .fm-settings-shell{
-        display: block;
+        grid-template-columns: minmax(0, 1fr);
         min-height: 0;
     }
 
@@ -2601,29 +2619,20 @@
         min-height: 34px;
         white-space: nowrap;
     }
+}
 
-    .fm-settings-row{
-        align-items: flex-start;
-        flex-direction: column;
-        gap: 12px;
+@media (max-width: 760px) {
+    .file-manager{
+        min-height: 0;
+        border-radius: 6px;
     }
 
-    
-
-    .fm-settings-control-wrap,
-.fm-settings-switch,
-.fm-nginx-actions{
-        align-self: flex-end;
-    }
-
-    .fm-settings-intro-title{
-        align-items: flex-start;
-        flex-direction: column;
-    }
-
-    .fm-settings-path-control{
-        width: min(100%, 320px);
+    .fm-terminal-dialog{
+        width: calc(100vw - 20px);
+        height: calc(100vh - 20px);
         min-width: 0;
+        min-height: 0;
+        resize: none;
     }
 
     .fm-toolbar{
@@ -3287,20 +3296,14 @@ html[data-harbor-file-manager] #view.fm-fluid-host{
     cursor: pointer;
 }
 .fm-remote-settings .fm-remote-editor .fm-settings-label {
-    flex: 0 0 auto;
-    min-width: 110px;
+    min-width: 0;
 }
 .fm-remote-settings .fm-remote-editor .fm-settings-control {
     flex: 1;
     min-width: 0;
     width: 100%;
 }
-.fm-remote-settings .fm-settings-row {
-    flex-wrap: wrap;
-}
-.fm-remote-settings .fm-settings-copy {
-    flex: 1;
-    min-width: 120px;
+.fm-remote-devices .fm-settings-label {
     overflow-wrap: anywhere;
 }
 .fm-remote-status {
@@ -3329,17 +3332,6 @@ html[data-harbor-file-manager] #view.fm-fluid-host{
 @media (max-width: 760px) {
     .fm-remote-settings .fm-remote-editor .fm-settings-control {
         flex: 0 0 auto;
-    }
-}
-
-@media (max-width: 640px) {
-    .fm-remote-settings .fm-remote-tools .fm-settings-row,
-    .fm-remote-settings .fm-remote-devices .fm-settings-row {
-        flex-direction: row;
-        align-items: center;
-    }
-    .fm-remote-settings .fm-remote-devices .fm-settings-copy {
-        flex-basis: 100%;
     }
 }
 
@@ -3390,8 +3382,9 @@ html[data-harbor-file-manager] #view.fm-fluid-host{
     width: 100%;
     gap: 6px;
 }
-.fm-remote-password .fm-settings-control {
-    flex: 1 1 auto;
+.fm-remote-settings .fm-remote-editor .fm-remote-password .fm-settings-control {
+    flex: 1 1 0;
+    width: 0;
     min-width: 0;
 }
 .fm-remote-password .fm-dialog-action {
@@ -3399,22 +3392,6 @@ html[data-harbor-file-manager] #view.fm-fluid-host{
     min-width: 34px;
     height: auto;
     padding: 0;
-}
-
-.fm-remote-settings .fm-remote-editor .fm-remote-password {
-    flex: 1 1 220px;
-    width: auto;
-}
-.fm-remote-settings .fm-remote-editor .fm-remote-password .fm-settings-control {
-    flex: 1 1 0;
-    width: 0;
-}
-
-@media (max-width: 760px) {
-    .fm-remote-settings .fm-remote-editor .fm-remote-password {
-        flex: 0 0 auto;
-        width: 100%;
-    }
 }
 
 .fm-remote-terminal{

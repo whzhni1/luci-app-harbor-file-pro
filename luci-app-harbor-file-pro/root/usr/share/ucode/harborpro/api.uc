@@ -82,6 +82,7 @@ const TOOL_PACKAGE_MAP = {
 	ssh:      'openssh-client',
 	sshpass:  'sshpass',
 	pv:       'pv',
+	timeout:  'coreutils-timeout',
 	stat:     'coreutils-stat',
 	sha256sum: 'coreutils-sha256sum',
 	curl:     'curl',

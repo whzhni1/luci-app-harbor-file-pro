@@ -350,8 +350,8 @@ html[data-harbor-file-manager] body.fm-window-resizing .fm-window-managed *{
 .fm-taskbar-pill::before{
     content: '';
     position: absolute;
-    left: -12px;
-    right: -12px;
+    left: calc(50% - 50vw);
+    right: calc(50% - 50vw);
     top: -13px;
     bottom: -6px;
 }

@@ -106,8 +106,12 @@ function remove_query(dir) {
 	fs.unlink(dir + '/error');
 	fs.rmdir(dir);
 }
+function timed_command(command, seconds) {
+ if (!H.command_exists('timeout')) missing_dependency('timeout', null, sprintf(H.tr('%s is not installed'), 'timeout'));
+ return 'timeout ' + seconds + ' sh -c ' + quote(command);
+}
 function shell(command, dir, timeout) {
-	let proc = fs.popen((timeout ? 'timeout ' + timeout + ' ' : '') + 'sh -c ' + quote(command) + ' 2>' + quote(dir + '/error'), 'r');
+	let proc = fs.popen((timeout ? timed_command(command, timeout) : 'sh -c ' + quote(command)) + ' 2>' + quote(dir + '/error'), 'r');
 	if (!proc) error('Cannot start SSH');
 	let output = proc.read(16777216) ?? '';
 	let rc = proc.close();
@@ -176,10 +180,10 @@ function trusted(d) {
 	save_json(ROOT + '/trust-' + challenge, { id: d.id, host: d.host, port: d.port, key, expires: time() + 300 });
 	error('Confirm SSH host key fingerprint', { challenge, device_id: d.id, name: d.name, host: d.host, port: d.port, fingerprint: 'SHA256:' + replace(b64enc(fingerprint), '=', '') });
 }
-function run(d, script) {
+function run(d, script, local_check) {
 	trusted(d);
 	let dir = workspace(), output;
-	try { output = shell(ssh_command(d, dir, script, false), dir, 25); }
+	try { output = shell(ssh_command(d, dir, script, false), dir, local_check && !d ? 0 : 25); }
 	catch (e) { remove_query(dir); die(e); }
 	remove_query(dir);
 	return output;
@@ -420,7 +424,7 @@ const REMOTE_STAT_INSTALL = "set -e\n" + STAT_DETECT + "[ \"$stat_kind\" = missi
 
 function tool_info(d) {
 	let script = STAT_DETECT + 'printf "%s\\n" "$stat_kind"\nif command -v apk >/dev/null 2>&1; then echo apk; elif command -v opkg >/dev/null 2>&1; then echo opkg; else echo none; fi\nid -u';
-	let lines = split(trim(run(d, 'sh -c ' + quote(script))), '\n');
+	let lines = split(trim(run(d, 'sh -c ' + quote(script), true)), '\n');
 	if (length(lines) != 3 || !match(lines[0], /^(command|busybox|missing)$/) || !match(lines[1], /^(apk|opkg|none)$/) || !match(lines[2], /^[0-9]+$/)) error('Invalid remote tool response');
 	return { stat: lines[0] != 'missing', stat_provider: lines[0], installer: lines[1], can_install: lines[1] != 'none' && lines[2] == '0', root: lines[2] == '0', device_revision: d?.revision ?? '' };
 }
@@ -438,7 +442,7 @@ function install_stat(p) {
 	let command;
 	try { command = ssh_command(d, dir + '/target', remote_script, false); }
 	catch (e) { cleanup(dir + '/target'); die(e); }
-	let script = 'umask 077\ncd ' + quote(dir) + '\ntrap \'rm -f target/password\' EXIT HUP INT TERM\ntimeout 900 sh -c ' + quote(command) + '\nrc=$?\nprintf "%s\\n" "$rc" > result.tmp\nmv result.tmp result\nexit "$rc"\n';
+	let script = 'umask 077\ncd ' + quote(dir) + '\ntrap \'rm -f target/password\' EXIT HUP INT TERM\n' + timed_command(command, 900) + '\nrc=$?\nprintf "%s\\n" "$rc" > result.tmp\nmv result.tmp result\nexit "$rc"\n';
 	return launch_task(dir, script, { task_id: id, kind: 'install', started: time(), done: false, device_id: d.id, device_revision: d.revision, package_name: 'coreutils-stat', package_type: info.installer == 'apk' ? 'apk' : 'ipk', installer: info.installer, path: d.name + ' (' + d.host + ':' + d.port + ')' });
 }
 
@@ -483,7 +487,7 @@ function dependency_info(p) {
   let script = 'tool=' + quote(spec.tool) + '\n' + "installed=0\navailable=0\nrunning=0\nif command -v \"$tool\" >/dev/null 2>&1; then installed=1; available=1; fi\n";
   if (spec.tool == 'ucode') script += 'available=0\n[ "$(' + AGENT_TOOLS + ')" != ok ] || available=1\n';
   script += "if [ \"$tool\" = ttyd ] || [ \"$tool\" = nginx ]; then\n for entry in /proc/[0-9]*/exe; do\n  case \"$(readlink \"$entry\" 2>/dev/null)\" in */\"$tool\"|*/\"$tool\"' (deleted)') running=1;; esac\n done\nfi\n[ \"$tool\" != ttyd ] || [ \"$running\" != 1 ] || available=1\nprintf 'HF_DEPENDENCY %s %s %s\\n' \"$installed\" \"$available\" \"$running\"\n";
-  let values = match(trim(run(d, script)), /^HF_DEPENDENCY ([01]) ([01]) ([01])$/);
+  let values = match(trim(run(d, script, true)), /^HF_DEPENDENCY ([01]) ([01]) ([01])$/);
   if (!values) error('Invalid remote tool response');
   result = { installed: values[1] == '1', available: values[2] == '1', running: values[3] == '1' };
  }
@@ -504,7 +508,7 @@ function agent_install(p) {
  script += info.installer == 'apk' ? 'apk update\napk add ucode ucode-mod-fs ucode-mod-uci\n' : 'opkg update\nopkg install ucode ucode-mod-fs ucode-mod-uci\n';
  script += AGENT_TOOLS + '\n';
  let command = ssh_command(d, dir + '/target', script, false);
- return launch_task(dir, 'umask 077\ncd ' + quote(dir) + '\ntrap \'rm -f target/password\' EXIT HUP INT TERM\ntimeout 900 sh -c ' + quote(command) + '\nrc=$?\nprintf "%s\\n" "$rc" > result.tmp\nmv result.tmp result\nexit "$rc"\n', { task_id: id, kind: 'install', started: time(), done: false, device_id: d.id, device_revision: d.revision, package_name: 'ucode ucode-mod-fs ucode-mod-uci', package_type: info.installer == 'apk' ? 'apk' : 'ipk', installer: info.installer, path: d.name + ' (' + d.host + ':' + d.port + ')' });
+ return launch_task(dir, 'umask 077\ncd ' + quote(dir) + '\ntrap \'rm -f target/password\' EXIT HUP INT TERM\n' + timed_command(command, 900) + '\nrc=$?\nprintf "%s\\n" "$rc" > result.tmp\nmv result.tmp result\nexit "$rc"\n', { task_id: id, kind: 'install', started: time(), done: false, device_id: d.id, device_revision: d.revision, package_name: 'ucode ucode-mod-fs ucode-mod-uci', package_type: info.installer == 'apk' ? 'apk' : 'ipk', installer: info.installer, path: d.name + ' (' + d.host + ':' + d.port + ')' });
 }
 function agent_prepare(p) {
  let d = agent_device(p);
@@ -716,7 +720,7 @@ function dispatch(http, helpers) {
 		if (action == 'devices') prune_runtime();
 		if (action == 'devices') {
 			let info = tool_info(null);
-			result = { devices: devices(false), tools: { sshpass: H.command_exists('sshpass'), pv: H.command_exists('pv'), ssh: H.command_exists('ssh'), stat: info.stat, stat_provider: info.stat_provider } };
+			result = { devices: devices(false), tools: { timeout: H.command_exists('timeout'), sshpass: H.command_exists('sshpass'), pv: H.command_exists('pv'), ssh: H.command_exists('ssh'), stat: info.stat, stat_provider: info.stat_provider } };
 		}
 		else if (action == 'dependency') result = dependency_info(p);
 		else if (action == 'tools') {

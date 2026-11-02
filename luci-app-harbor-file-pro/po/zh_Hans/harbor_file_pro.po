@@ -1932,3 +1932,9 @@ msgstr "取消勾选后仅修改普通文件，当前目录和所有子目录的
 
 msgid "Required archive tool is not installed"
 msgstr "所需的压缩工具未安装"
+
+msgid "Install the required local tools above before configuring remote devices."
+msgstr "请先安装上方所需的本机工具，再配置远程设备。"
+
+msgid "Provides time limits for remote checks and bootstrap installations."
+msgstr "为远程检查及引导安装提供超时保护。"

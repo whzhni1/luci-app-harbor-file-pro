@@ -202,7 +202,6 @@
             enable_thumbnails: next_thumbnails,
             restore_last_directory: next_restore_dir
         }, HF.labels.settings_saved, function(data) {
-            HF.close_modal();
             HF.apply_preferences(data);
             HF.refresh_navigation(HF.refresh_current);
         });
@@ -243,7 +242,6 @@
             uhttpd_network_timeout: network_timeout
         }, HF.labels.web_server_settings_saved, function(data) {
             button.disabled = false;
-            HF.close_modal();
             HF.apply_preferences(data || {});
         }, function() {
             button.disabled = false;
@@ -283,7 +281,6 @@
             'buffer-size': buffer_size
         }, HF.labels.nginx_settings_saved, function(data) {
             button.disabled = false;
-            HF.close_modal();
             HF.apply_preferences(data || {});
         }, function() {
             button.disabled = false;

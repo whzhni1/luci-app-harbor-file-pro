@@ -93,6 +93,7 @@ HarborFile.init({
         remote_source_retained: '{{ _('Source retained') }}',
         remote_source_unknown: '{{ _('Source deletion status unknown; check before retrying') }}',
 
+        remote_timeout_description: '{{ _('Provides time limits for remote checks and bootstrap installations.') }}',
         remote_sshpass_description: '{{ _('Authenticates SSH with the saved password.') }}',
         remote_pv_description: '{{ _('Measures transfer bytes, speed and elapsed time.') }}',
         remote_stat_description: '{{ _('Reads file size, modification time and permissions. Required on both endpoints.') }}',
@@ -121,6 +122,7 @@ HarborFile.init({
         remote_name_placeholder: '{{ _('e.g. Living room router') }}',
         remote_password_placeholder: '{{ _('Enter password') }}',
         remote_required: '{{ _('Complete all device fields') }}',
+        remote_setup_tools_required: '{{ _('Install the required local tools above before configuring remote devices.') }}',
         remote_name: '{{ _('Device name') }}',
         remote_host: '{{ _('IP / domain') }}',
         remote_port: '{{ _('Port') }}',
