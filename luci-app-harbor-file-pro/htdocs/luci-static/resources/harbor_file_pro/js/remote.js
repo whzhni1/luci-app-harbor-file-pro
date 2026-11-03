@@ -135,9 +135,12 @@
     HF.remote_unavailable = function() { HF.set_warning_status(label('unavailable')); };
     function loadDevices() {
         var sequence = ++deviceSequence; devicesLoading = true;
+        var add = document.getElementById('fm_remote_add_device');
+        if (add) add.disabled = true;
         return request('devices').then(function(data) {
             if (sequence === deviceSequence) {
                 devicesLoaded = true;
+                if (add) add.disabled = !localToolsReady(data.tools);
                 devices.clear();
                 (data.devices || []).forEach(function(d) { devices.set(d.id, d); });
                 capacities.forEach(function(entry, id) { if (!currentCapacity(entry)) capacities.delete(id); });
@@ -181,7 +184,8 @@
         var content = document.getElementById('fm_content'); HF.clear_node(content);
         var header = HF.Util.createElement('div', 'fm-page-header');
         header.appendChild(HF.Util.createElement('h1', 'fm-page-title', label('devices')));
-        header.appendChild(button(label('add'), openSettings)); content.appendChild(header);
+        var add = button(label('add'), openSettings); add.id = 'fm_remote_add_device'; add.disabled = true;
+        header.appendChild(add); content.appendChild(header);
         tasks.forEach(function(task) {
             content.appendChild(button(label('transfer') + ' · ' + task.description, function() { showTask(task); }));
         });
@@ -298,6 +302,7 @@
     };
     function openSettings() {
         HF.load_preferences(function() {
+            document.getElementById('fm_remote_settings')._openAdd = true;
             HF.populate_settings_dialog(); HF.set_settings_tab('remote'); HF.open_modal('fm_settings_dialog');
         });
     }
@@ -309,11 +314,38 @@
         }
         if (activeDevice() === id && identityChanged || HF.state.current && HF.state.current.kind === 'remote_devices') HF.show_remote_devices(false);
     }
+    function localToolsReady(tools) {
+        return ['ssh', 'timeout', 'sshpass', 'pv', 'stat'].every(function(tool) { return tools && tools[tool] === true; });
+    }
     function updateDeviceEditor(host) {
-        var disabled = !host._toolsReady || !!host._saving;
-        Object.keys(host._inputs).forEach(function(key) { host._inputs[key].disabled = disabled; });
-        [host._passwordToggle, host._save, host._reset].forEach(function(node) { node.disabled = disabled; });
+        var busy = !!host._saving, disabled = !host._toolsReady || busy || !!host._loading;
+        Object.keys(host._inputs).forEach(function(key) { host._inputs[key].disabled = busy; });
+        host._passwordToggle.disabled = busy;
+        host._save.disabled = busy || !!host._loading;
+        host._cancel.disabled = busy;
+        host._add.disabled = disabled;
+        host._add.setAttribute('aria-expanded', !host._form.hidden && !host._deviceId ? 'true' : 'false');
+        host._editButtons.forEach(function(button, id) {
+            button.disabled = disabled;
+            button.setAttribute('aria-expanded', !host._form.hidden && host._deviceId === id ? 'true' : 'false');
+        });
         host._dependencyHint.hidden = host._toolsReady === true;
+    }
+    function closeDeviceEditor(host) {
+        host._editorSequence = (host._editorSequence || 0) + 1;
+        host._deviceId = '';
+        host._loading = false;
+        host._form.hidden = true;
+        host._form.reset();
+        Object.keys(host._inputs).forEach(function(key) { host._inputs[key].setCustomValidity(''); });
+        host._inputs.password.type = 'password';
+        host._passwordToggle.setAttribute('aria-pressed', 'false');
+        host._passwordToggle.title = label('show_password');
+        host._passwordToggle.setAttribute('aria-label', label('show_password'));
+        host._message.textContent = '';
+        host._addBlock.appendChild(host._form);
+        host._addBlock.appendChild(host._message);
+        updateDeviceEditor(host);
     }
     function renderLocalTools(host, tools, checking) {
         HF.clear_node(host._tools);
@@ -326,28 +358,45 @@
     }
     function editDevice(id) {
         var host = document.getElementById('fm_remote_settings');
-        if (!host._toolsReady || host._saving) return;
-        var sequence = host._editorSequence = (host._editorSequence || 0) + 1;
+        if (!host._toolsReady || host._saving || host._loading) return;
+        if (!host._form.hidden && host._deviceId === id) { host._inputs.name.focus(); return; }
+        closeDeviceEditor(host);
+        var sequence = host._editorSequence;
+        host._loading = true; updateDeviceEditor(host);
+        host._message.textContent = HF.labels.checking;
         var data = id ? request('get', { id: id }) : Promise.resolve({ id: '', name: '', host: '', port: '', username: '', password: '' });
         data.then(function(d) {
             if (sequence !== host._editorSequence) return;
+            var block = id ? host._deviceBlocks.get(id) : host._addBlock;
+            if (!block || id && d.id !== id) throw new Error(label('stale_device'));
             host._deviceId = d.id;
-            host._inputs.password.type = 'password';
-            host._passwordToggle.setAttribute('aria-pressed', 'false');
-            host._passwordToggle.title = label('show_password');
-            host._passwordToggle.setAttribute('aria-label', label('show_password'));
-            Object.keys(host._inputs).forEach(function(k) { host._inputs[k].value = d[k] === undefined ? '' : d[k]; host._inputs[k].setCustomValidity(''); });
+            Object.keys(host._inputs).forEach(function(k) { host._inputs[k].value = d[k] === undefined ? '' : d[k]; });
+            block.insertBefore(host._form, id ? block.children[1] : host._message);
+            host._form.appendChild(host._message);
+            host._form.setAttribute('aria-label', id ? label('edit') + ' · ' + d.name : label('add'));
+            host._form.hidden = false;
             host._message.textContent = '';
             host._inputs.name.focus();
-        }).catch(function(error) { host._message.textContent = error.message; });
+        }).catch(function(error) {
+            if (sequence === host._editorSequence) host._message.textContent = error.message;
+        }).finally(function() {
+            if (sequence === host._editorSequence) { host._loading = false; updateDeviceEditor(host); }
+        });
     }
     function buildSettings(host) {
         if (host._inputs) return;
         host.className = 'fm-settings-panel-main fm-remote-settings';
         host._tools = HF.Util.createElement('div', 'fm-remote-tools');
         host._devices = HF.Util.createElement('div', 'fm-remote-devices');
-        host.appendChild(host._tools); host.appendChild(host._devices);
-        var form = HF.Util.createElement('form', 'fm-remote-editor'); host._inputs = Object.create(null);
+        host.appendChild(host._tools);
+        host._editButtons = new Map(); host._deviceBlocks = new Map();
+        host._addBlock = HF.Util.createElement('div', 'fm-remote-add');
+        var addActions = HF.Util.createElement('div', 'fm-settings-page-actions');
+        host._add = button(label('add'), function() { editDevice(''); });
+        host._add.setAttribute('aria-controls', 'fm_remote_device_form');
+        addActions.appendChild(host._add); host._addBlock.appendChild(addActions);
+        var form = host._form = HF.Util.createElement('form', 'fm-remote-editor');
+        form.id = 'fm_remote_device_form'; form.hidden = true; host._inputs = Object.create(null);
         ['name', 'host', 'port', 'username', 'password'].forEach(function(key) {
             var row = HF.Util.createElement('div', 'fm-settings-row');
             var text = HF.Util.createElement('label', 'fm-settings-label', label(key));
@@ -377,18 +426,20 @@
             form.appendChild(row);
         });
         var actions = HF.Util.createElement('div', 'fm-settings-page-actions');
-        var reset = button(label('add'), function() { editDevice(''); });
+        var cancel = button(label('cancel'), function() { if (!host._saving) closeDeviceEditor(host); });
         var save = button(label('save'), function() {}, true); save.type = 'submit';
-        actions.appendChild(reset); actions.appendChild(save); form.appendChild(actions);
-        host._save = save; host._reset = reset;
+        actions.appendChild(cancel); actions.appendChild(save); form.appendChild(actions);
+        host._save = save; host._cancel = cancel;
         host._dependencyHint = HF.Util.createElement('div', 'fm-remote-status', label('setup_tools_required'));
         host._dependencyHint.setAttribute('role', 'status');
         host.appendChild(host._dependencyHint);
-        host._message = HF.Util.createElement('div', 'fm-remote-status'); form.appendChild(host._message); host.appendChild(form);
+        host._message = HF.Util.createElement('div', 'fm-remote-status'); host._message.setAttribute('role', 'status');
+        host._addBlock.appendChild(form); host._addBlock.appendChild(host._message);
+        host.appendChild(host._addBlock); host.appendChild(host._devices);
         updateDeviceEditor(host);
         form.addEventListener('submit', function(event) {
             event.preventDefault();
-            if (!host._toolsReady || host._saving) return;
+            if (form.hidden || host._loading || host._saving) return;
             Object.keys(host._inputs).forEach(function(key) {
                 var input = host._inputs[key];
                 input.setCustomValidity(input.value.trim() ? '' : label('required'));
@@ -400,9 +451,9 @@
             Object.keys(host._inputs).forEach(function(key) { values[key] = host._inputs[key].value; });
             host._saving = true; updateDeviceEditor(host);
             request('save', values).then(function(data) {
-                if (editSequence === (host._editorSequence || 0)) host._deviceId = data.id;
+                if (editSequence === (host._editorSequence || 0)) closeDeviceEditor(host);
                 deviceChanged(data.id, !!previous && (previous.host !== values.host.trim() || previous.port !== Number(values.port) || previous.username !== values.username));
-                host._message.textContent = HF.labels.settings_saved;
+                HF.set_status(HF.labels.settings_saved, 'success');
                 HF.render_remote_settings();
             }).catch(function(error) { host._message.textContent = error.message; }).finally(function() { host._saving = false; updateDeviceEditor(host); });
         });
@@ -416,10 +467,10 @@
         renderLocalTools(host, null, true);
         loadDevices().then(function(data) {
             if (sequence !== settingsSequence) return;
-            host._toolsReady = ['ssh', 'timeout', 'sshpass', 'pv', 'stat'].every(function(tool) { return data.tools && data.tools[tool] === true; });
-            updateDeviceEditor(host);
+            host._toolsReady = localToolsReady(data.tools);
             renderLocalTools(host, data.tools);
-            HF.clear_node(host._devices);
+            host._addBlock.appendChild(host._form);
+            HF.clear_node(host._devices); host._editButtons.clear(); host._deviceBlocks.clear();
             data.devices.forEach(function(d) {
                 var row = HF.Util.createElement('div', 'fm-settings-row');
                 var copy = HF.Util.createElement('div', 'fm-settings-copy');
@@ -428,28 +479,38 @@
                 row.appendChild(copy);
                 var actions = HF.Util.createElement('div', 'fm-nginx-actions');
                 var edit = button(label('edit'), function() { editDevice(d.id); });
-                edit.disabled = !host._toolsReady || !!host._saving;
+                edit.setAttribute('aria-controls', 'fm_remote_device_form');
+                host._editButtons.set(d.id, edit);
                 actions.appendChild(edit);
                 actions.appendChild(button(label('remove'), function() {
                     HF.confirm_window({ title: label('remove'), message: label('delete') + '\n' + d.name }).then(function(yes) {
                         if (!yes) return;
                         request('delete', { id: d.id }).then(function() {
                             deviceChanged(d.id, true);
-                            if (host._deviceId === d.id) editDevice('');
+                            if (host._deviceId === d.id) closeDeviceEditor(host);
                             HF.render_remote_settings();
                         }).catch(function(error) { host._message.textContent = error.message; });
                     });
                 }));
                 row.appendChild(actions);
                 var block = HF.Util.createElement('div', 'fm-remote-device');
+                block.dataset.deviceId = d.id; host._deviceBlocks.set(d.id, block);
                 block.appendChild(row);
+                if (!host._form.hidden && host._deviceId === d.id) block.appendChild(host._form);
                 var dependency = toolRow('coreutils-stat · ' + label('remote_side'), label('unchecked'), label('remote_stat_description'));
                 dependency.dataset.deviceId = d.id; dependency.classList.add('fm-remote-dependency');
                 block.appendChild(dependency); host._devices.appendChild(block);
                 renderDependency(dependency, d);
             });
+            if (host._deviceId && !host._deviceBlocks.has(host._deviceId)) closeDeviceEditor(host);
+            updateDeviceEditor(host);
+            if (host._openAdd) {
+                host._openAdd = false;
+                if (document.getElementById('fm_settings_panel_remote').classList.contains('active')) editDevice('');
+            }
         }).catch(function(error) {
             if (sequence !== settingsSequence) return;
+            host._openAdd = false;
             host._toolsReady = false; updateDeviceEditor(host);
             renderLocalTools(host, null, false);
             host._message.textContent = error.message;
