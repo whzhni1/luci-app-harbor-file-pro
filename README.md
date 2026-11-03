@@ -1,130 +1,110 @@
+# Harbor File Pro
+[**简体中文**](./CN_README.md) | English
 
-# Harbor File Pro: Smoother File Management for OpenWrt
+**A LuCI plugin for OpenWrt that can truly be used as a desktop-class file manager.**
 
-[**中文版本**](./CN_README.md) | Switch to Chinese
+Harbor File Pro takes file management to a new level. The original Harbor File made it usable; Harbor File Pro makes it good to use—features, operation experience, and visual experience are refined to the finest detail.
 
-**Harbor File Pro** is a deeply enhanced OpenWrt file manager based on [destan19/luci-app-harbor-file](https://github.com/destan19/luci-app-harbor-file).  
-While retaining all the excellent features of the original, I have spent my spare time on **code refactoring** and **dozens of practical new features**. Since multiple pull requests were not merged upstream, I have released it independently as the **Pro Edition**.  
-**Better performance, smoother operations, and more powerful functionality** — that's the new experience Pro brings to you.
+> Unlimited-size text/Hex editing · Multi-terminal keep-alive and remote device interconnection · Enhanced extraction/compression · Taskbar multi-window · Favorites · Permission visualization · Full mobile adaptation.
 
-
-## 📸 Screenshots
-
-![0](images/0.png)  
-![1](images/1.png)  
-![2](images/2.png)  
-![3](images/3.png)  
-![4](images/4.png)  
-![5](images/5.png)
-![6](images/6.png)
-
+![Harbor File Pro main interface](images/01.jpeg)
 
 ---
 
-## 🎯 Pro Edition Core Highlights (Comprehensive Upgrades over Original)
-
-### 🪟 Modern Window Interaction — As Smooth as a Desktop App
-- **Window Controls**: Support maximize/minimize, resize freely, and automatically remember window size.
-- **Taskbar & Drag**: Drag the title bar to move; new taskbar for quick switching between multiple windows, auto-hide after 3 seconds of inactivity, and bring it back by scrolling with mouse or sliding on mobile.
-- **Adaptive Scrolling**: Pages automatically fill the screen, with horizontal/vertical scrolling support when content overflows.
-
-### 📝 Text Editor — Handles Large Files with Ease and Smarter Operations
-- **Find & Replace**: Support case sensitivity, display result count and positions, highlight matches; provide Replace, Replace All, and Previous/Next navigation.
-- **Infinite Undo/Redo**: Easily revert mistakes.
-- **Crash Recovery**: Automatically ask to recover unsaved changes after accidental closure or crash to prevent data loss.
-- **Toggle Line Numbers**: Show/hide line numbers with one click.
-- **Auto-indent & Word Wrap**: Auto-indent when editing code (not for plain text), and support word wrap for viewing.
-- **🚀 Performance Breakthrough**: **No file size limit** — open a 1TB file as smoothly as a 1KB file (depends on device performance, browser will not freeze).
-
-### 🔢 Hex Editor — Professional Debugging Tool
-- **Find & Replace**: Support regular expressions, case sensitivity, display match positions and count, highlight matches; support Replace and Replace All.
-- **Dual View Sync**: Simultaneously display hex view (00-0F) and ASCII view; click on any data in either view, the other view highlights the corresponding position synchronously.
-- **Undo/Redo & Crash Recovery**: Same as text editor — infinite undo steps and recovery from unexpected closure.
-- **Same Performance Breakthrough**: Smooth operations on large files without memory overflow issues.
-
-### 📂 File Management & Compression/Extraction — More Humanized Details
-- **Directory Restoration**: Automatically open the last accessed directory after refresh or re-entry.
-- **Compression Enhancements**: Added `gz` format; support custom compression paths; prompt to overwrite if file already exists.
-- **Extraction Enhancements**: Support setting extraction path; prompt to overwrite if file already exists.
-- **Paste Conflict Handling**: For duplicate file names, choose among **Overwrite**, **Rename** (auto-add sequence like `1.(1).txt`), or **Skip** — no more headaches.
-
-### ⭐ Favorites (Similar to Edge Browser) — One‑Click Access to Frequently Used Directories
-- **Add/Remove Favorite**: Click the ☆ on the address bar to favorite the current path; click again to remove.
-- **Open Favorites Panel**: Click the ★ button after the address bar to pop up the management panel.
-- **Full Management**: Support setting favorite name, address (directory), create new folders, move folders, delete, etc., making common paths easily accessible.
-
-### 📱 Mobile‑Friendly
-- **Single‑tap to Open, Long‑press for Context Menu**: Tap a file/folder to open, long‑press to show action menu.
-- **Drag to Move**: Tap and hold a file to drag and move; support multi‑select and batch dragging.
-- **Auto‑scroll**: When dragging files to the edge of a long page, the page automatically scrolls.
-- **Selection Optimization**: When marking files, the page automatically scrolls to the top or bottom for smoother operations.
-
-### ✏️ Address Bar Interaction Enhanced
-- **Click on the blank area of the address bar to directly enter a path**, enabling quick jumps.
-- The original address bar is completely non‑clickable for input on both desktop and mobile; this Pro‑exclusive feature greatly improves efficiency.
-
-### 🔧 Property Page Permission Editing
-- In the file/folder properties page, **added permission display and editing**.
-- Supports **checking** read/write/execute permissions, as well as **manual input** of numeric permission values (e.g., 755) for more flexible and intuitive control.
-
-### 🔧 Other Practical Enhancements
-- **Fixed the issue where opening ttyd from external networks would prompt "not installed"**.
-- **UI Details**: Truncate long filenames with `...`; improved recognition of files without extensions.
-- **Error Prompts**: Use Windows‑style windowed notifications for a more intuitive experience.
+While retaining all original features, it has completed a **code refactor** and **dozens of practical new features**. Because multiple submissions were not merged upstream, it was released independently as the **Pro version**.  
+**Better performance, smoother operation, better visuals, stronger features, and multi-device adaptation** — this is the all-new experience Pro brings you.
 
 ---
 
-## 📦 All Original Features Are Also Included (Pro Contains Full Basic Capabilities)
+## 🚀 Core Unique Features (Differences from the Original)
 
-Harbor File Pro fully retains all core features of the original Harbor File, giving you a complete Windows‑like file manager experience on OpenWrt:
+### 1. Hex Editor: 1TB Files Without Lag, Browser Without Freezing
+The original Hex editor could only “view” and could not open large files. Pro turns the Hex editor into a **professional-grade modification tool**.
+- **Zero pressure with large files**: Opening a **1TB or 10TB file is as smooth as opening a 1KB file**, with no lag. Operations on large binary files absolutely do not trigger OOM (out of memory), and the browser does not freeze.
+- **Regex find and replace**: Supports regular expressions and case sensitivity, displays match positions and count, highlights results, and supports Replace / Replace All.
+- **Synchronized dual views**: Hex view (00–0F) and ASCII view are displayed simultaneously; clicking either side **synchronously highlights the corresponding position on the other side**.
+- **Undo / redo + exception recovery**: Unsaved changes can be recovered after an accidental close.
 
-- **Visual File Browsing**: Icon/Tile/List views, breadcrumb navigation, quick access, disk space display.
-- **Complete File Operations**: New, rename, delete, copy/cut/paste, batch operations, upload/download (with progress).
-- **Text Editor**: Supports common formats like `txt, log, conf, json, lua, sh`, with online editing and saving.
-- **Hex Viewer**: View Hex and ASCII content of non‑text files.
-- **Media Preview**: Images (PNG/JPG/GIF/WebP, etc.), PDF, videos (MP4/MKV/AVI, etc.).
-- **Package Management**: Support uploading and one‑click installation of `.ipk` and `.apk` packages, with detailed log display.
-- **Terminal Integration**: If ttyd is installed, open a Web Terminal from the current directory with one click.
-- **Security Controls**: System directories are protected by default; toggle display of hidden files; settings saved to UCI.
+![Hex editor](images/03.jpeg)
+
+### 2. Extraction and Compression: Comprehensive Capabilities That Outperform the Original
+The original extraction capability is very basic. Pro comprehensively expands in **four dimensions: format support, path control, conflict handling, and batch operations**:
+- **Extraction enhancements**: Preview files like WinRAR, select specific files to extract, and **choose the target path before extraction** (breadcrumb navigation or manual input); prompt before overwriting same-name files, never silently overwrite or fail directly; under long paths, retain blank clickable areas to prevent inability to enter a path.
+- **Compression enhancements**: **Choose the output path when compressing**; prompt to overwrite when the target file already exists; **fix the issue of losing existing files when overwriting folders**; support more extraction formats.
+- **Three paste conflict options**: For same-name files, choose **Overwrite / Rename (auto-numbered) / Skip**. The original has no such conflict decision mechanism.
+![Compression and extraction](images/06.jpeg)
+
+### 3. File Operations and Permission Management: Equally Refined to the Finest Detail
+The original has no permission editing. Pro adds **permission editing, recursive scope control**, and a **visual dual mode**.
+- **Permission visualization**: Check read/write/execute directly on the file/folder properties page, or manually enter numbers such as `755`.
+- **Advanced recursive permissions**: Distinguish “**apply only to files**” or “**apply to directories and files**,” changing only regular files while keeping directory permissions unchanged.
+- **Directory upload and statistics**: Upload an entire folder directly; the properties page shows directory size, subdirectory count, and file count.
+- **Detail experience**: Preserve original permissions when overwriting files; support direct rename input; support the “replace file” function; manually enter the target path when moving/copying.
+- **Uninstall cleanup**: Automatically clean up residual files when uninstalling the plugin.
+
+![Permission management and personalization settings](images/02.jpeg)
+
+### 4. Remote Device Interconnection and Multi-Terminal Management
+This is a cross-device workflow completely absent from the original:
+- **File hub center**: Operations on remote devices are exactly the same as local operations—install on one end, benefit on all ends.
+- **Cross-device interconnection**: Treat the file system of a remote OpenWrt device as a local directory, supporting cross-device copy/paste/move/cut.
+- **sha256 security verification**: When cutting/moving across devices, run `sha256sum` verification first and **delete the source file only after it passes**, preventing transfer loss.
+- **Multi-terminal and keep-alive**: Open multiple terminals simultaneously (local/remote); minimizing a window **retains the connection** (only clicking X destroys it); support one-click refresh and reconnect, and opening external links in a new page.
+
+![Remote device interconnection and multi-terminal](images/04.jpeg)
+
+### 5. Text Editor: No Data Loss, Code Highlighting
+- **No file size limit**: Text files are equally smooth, and the browser does not freeze.
+- **Professional-grade search**: Case sensitivity, match count, highlighted positioning, Replace / Replace All / previous and next.
+- **Data safety**: **Undo/redo**; after an accidental close, automatically ask whether to recover unsaved changes.
+- **Code highlighting**: Prism syntax highlighting with online updates, and automatic cleanup of U+200B zero-width spaces.
+
+![Text editor and code highlighting](images/05.jpeg)
+
+### 6. Desktop-Class Window Interaction and Interface
+- **Multi-window and taskbar**: Freely resize/maximize/minimize, with window size memory; the taskbar can be summoned at any position—left/center/right—at the bottom of the desktop, and **auto-hides after 3 seconds idle**; window switching logic follows Windows (click an inactive window to bring it to the front; click the current window to minimize it).
+- **Favorites**: Favorite the current path, with support for **naming, creating folders, moving, and deleting**.
+- **Win11-style theme**: Supports dark/light themes, automatic switching based on the browser, custom transparency and frosted glass effects, and adaptation to third-party themes (tested themes: `luci-theme-glass`, `aurora`, `Argon`); screen-fill toggle; error prompts changed to Windows-style popups.
+
+### 7. Full Touchscreen Adaptation for Mobile
+It is not about shrinking the desktop layout; the touch logic has been fully written and adapted:
+- Tap to open, long-press for menu; long-press and drag to move, with multi-select batch dragging.
+- Dragging to the page edge auto-scrolls; when selecting files, the page automatically scrolls to the top/bottom.
+- And that’s not all; it is also adapted when the mobile browser is set to desktop mode.
+
+<p align="center">
+  <img src="images/mobile.jpeg" width="300" alt="Mobile interface">  <img src="images/mobile_Desktop.jpeg" width="300" alt="Mobile desktop">
+</p>
+
+### 8. Other Efficiency Tools
+- **Address bar click-to-input**: Click a blank area to directly type a path (works on desktop and mobile).
+- **Dependency installation loop**: Use a feature -> automatically check dependencies -> prompt to install on the **correct device** -> continue the original operation after installation, with no manual retry.
 
 ---
 
-## ⚙️ Technical Refactoring (Developer Perspective)
+## 📦 Installation and Compatibility
 
-- **Full Code Migration**: Migrated entirely from Lua to **ucode** with a modular architecture, reducing code volume by **60%** (excluding new feature code), resulting in higher runtime efficiency and lower memory usage (requires OpenWrt 22.03 or later).
-- **Standalone CGI**: The download function is separated from the dispatcher as an independent CGI, using native browser streaming download, so large files no longer consume memory, avoiding OOM.
-- **Frontend Refactoring**: All frontend code is modularized by type, making it easier to maintain and extend.
+### One-Click Installation (Recommended)
 
----
+Use curl or wget to execute the following command:
 
-## 📥 Installation
-
-### One‑click Installation (Recommended)
-
-Use curl or wget to run the following command:
-
+**Using curl:**
 ```bash
-# Using curl
 curl -fsSL "https://gitlab.com/whzhni/tailscale/-/raw/main/Auto_Install_Script.sh" | sh -s luci-app-harbor-file-pro
 ```
 
+**Using wget:**
 ```bash
-# Using wget
 wget -q -O - "https://gitlab.com/whzhni/tailscale/-/raw/main/Auto_Install_Script.sh" | sh -s luci-app-harbor-file-pro
 ```
 
-### Manual Installation
+Or download the `.ipk` / `.apk` from [Releases](https://github.com/whzhni1/luci-app-harbor-file-pro/releases) for manual installation.
 
-You can also download the `.ipk` or `.apk` package and install it via the plugin's built‑in installation feature or using `opkg`/`apk` commands.
-
----
-
-## 🙏 Acknowledgements
-
-- The original project author [destan19](https://github.com/destan19/luci-app-harbor-file) for their outstanding work.
-- All enthusiastic users who participated in testing and provided feedback — your suggestions have made the Pro edition better.
+> **Compatibility**: Can be installed alongside the original `luci-app-harbor-file` without conflict.
 
 ---
 
-**Harbor File Pro** — Making OpenWrt file management as simple as using Windows, yet more powerful than the original. Welcome to experience it!
-```
+## License and Acknowledgements
+
+Based on deep refactoring and extension of [destan19/luci-app-harbor-file](https://github.com/destan19/luci-app-harbor-file), following the original project license. Thanks to the original author for the excellent foundational work.
+## Harbor File Pro: Started from the Original, Surpassing the Original
