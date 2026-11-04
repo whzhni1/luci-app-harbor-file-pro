@@ -343,12 +343,84 @@
     }
 
     HF.wm_open_image_window = function wm_open_image_window(item) {
+        item = Object.assign({}, item);
+        var key = HF.file_key(item), directory = HF.parent_directory(item.path);
+        var images = HF.rendered_file_items().map(function(entry) { return entry.item; }).filter(function(candidate) {
+            return candidate.type !== 'directory' && (candidate.device_id || '') === (item.device_id || '') &&
+                (candidate.device_revision || '') === (item.device_revision || '') && HF.parent_directory(candidate.path) === directory &&
+                (candidate.preview === 'image' || HF.file_key(candidate) === key ||
+                    HF.state.open_type_map && HF.state.open_type_map[HF.file_key(candidate)] === 'image');
+        }).map(function(candidate) { return Object.assign({}, candidate); });
+        var index = images.findIndex(function(candidate) { return HF.file_key(candidate) === key; });
+        if (index < 0) { images = [item]; index = 0; }
+        else images[index] = item;
+        var prefix = item.device_id && HF.remote_device_name ? HF.remote_device_name(item.device_id) + ' · ' : '';
         var stage = HF.Util.createElement('div', 'fm-window-media-stage');
+        var viewport = HF.Util.createElement('div', 'fm-image-viewport');
+        var scale = 1, x = 0, y = 0, pointers = new Map();
         var error = HF.Util.createElement('div', 'fm-window-media-error', HF.labels.request_failed);
-        var image = HF.Util.createElement('img', '');
-        image.alt = item.name || '';
-        stage.appendChild(error);
-        stage.appendChild(image);
+        var image = null;
+        stage.appendChild(viewport);
+        viewport.appendChild(error);
+        function paint() {
+            if (!image || !image.naturalWidth || image.style.display === 'none' || !viewport.clientWidth || !viewport.clientHeight) return;
+            var limitX = Math.max(0, (image.clientWidth * scale - viewport.clientWidth) / 2);
+            var limitY = Math.max(0, (image.clientHeight * scale - viewport.clientHeight) / 2);
+            x = Math.max(-limitX, Math.min(limitX, x)); y = Math.max(-limitY, Math.min(limitY, y));
+            image.style.transform = 'translate(' + x + 'px,' + y + 'px) scale(' + scale + ')';
+            viewport.classList.toggle('is-zoomed', limitX > 0 || limitY > 0);
+            viewport.classList.toggle('is-dragging', pointers.size > 0);
+        }
+        function point(clientX, clientY) {
+            var rect = viewport.getBoundingClientRect();
+            return { x: clientX - rect.left - rect.width / 2, y: clientY - rect.top - rect.height / 2 };
+        }
+        function transform(value, from, to) {
+            var nextScale = Math.max(.1, Math.min(16, value)), ratio = nextScale / scale;
+            x = to.x - (from.x - x) * ratio; y = to.y - (from.y - y) * ratio;
+            scale = nextScale; paint();
+        }
+        function gesture() {
+            var points = Array.from(pointers.values()), first = points[0], second = points[1] || first;
+            return { center: point((first.x + second.x) / 2, (first.y + second.y) / 2),
+                distance: Math.hypot(first.x - second.x, first.y - second.y) };
+        }
+        viewport.addEventListener('wheel', function(event) {
+            event.preventDefault(); event.stopPropagation();
+            if (!image || image.style.display === 'none') return;
+            var delta = event.deltaY * (event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? viewport.clientHeight : 1);
+            var anchor = point(event.clientX, event.clientY);
+            transform(scale * Math.exp(-Math.max(-240, Math.min(240, delta)) * .002), anchor, anchor);
+        }, { passive: false });
+        viewport.addEventListener('pointerdown', function(event) {
+            if (event.button !== 0 || pointers.size >= 2 || !image || image.style.display === 'none') return;
+            event.preventDefault();
+            pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+            viewport.setPointerCapture(event.pointerId); paint();
+        });
+        viewport.addEventListener('pointermove', function(event) {
+            if (!pointers.has(event.pointerId)) return;
+            event.preventDefault();
+            var before = gesture();
+            pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+            var after = gesture();
+            transform(scale * (before.distance > 0 ? after.distance / before.distance : 1), before.center, after.center);
+        });
+        function release(event) {
+            pointers.delete(event.pointerId);
+            if (viewport.hasPointerCapture(event.pointerId)) viewport.releasePointerCapture(event.pointerId);
+            paint();
+        }
+        ['pointerup', 'pointercancel', 'lostpointercapture'].forEach(function(type) { viewport.addEventListener(type, release); });
+        function clearImage() {
+            var ids = Array.from(pointers.keys()); pointers.clear();
+            ids.forEach(function(id) { if (viewport.hasPointerCapture(id)) viewport.releasePointerCapture(id); });
+            scale = 1; x = 0; y = 0;
+            viewport.classList.remove('is-zoomed', 'is-dragging');
+            if (!image) return;
+            image.onload = null; image.onerror = null;
+            image.removeAttribute('src'); image.remove(); image = null;
+        }
         var record = HF.window_manager.create({
             title: item.name || HF.tr('Image'),
             icon: item.icon_name || 'image',
@@ -358,22 +430,40 @@
             height: 650,
             minWidth: 330,
             minHeight: 240,
-            onClose: function() {
-                image.onload = null;
-                image.onerror = null;
-                image.removeAttribute('src');
-            }
+            onClose: function() { if (observer) observer.disconnect(); clearImage(); }
         });
-        image.onload = function() {
-            error.style.display = 'none';
-            image.style.display = 'block';
-        };
-        image.onerror = function() {
-            image.style.display = 'none';
-            error.textContent = HF.labels.request_failed;
-            error.style.display = 'block';
-        };
-        image.src = HF.file_io(item).inlineURL(item.path) + '&v=' + encodeURIComponent(item.mtime || 0);
+        var navigation = HF.Util.createElement('div', 'fm-image-navigation');
+        var previous = HF.window_manager.add_control(navigation, 'previous-image', '←', HF.labels.prev_window, function() { show(index - 1); });
+        var next = HF.window_manager.add_control(navigation, 'next-image', '→', HF.labels.next_window, function() { show(index + 1); });
+        previous.classList.add('fm-image-nav', 'fm-image-previous');
+        next.classList.add('fm-image-nav', 'fm-image-next');
+        record.minimize_button.parentNode.insertBefore(navigation, record.minimize_button);
+        var observer = window.ResizeObserver ? new ResizeObserver(paint) : null;
+        if (observer) observer.observe(viewport);
+        function show(position, initial) {
+            if (record.closed || position < 0 || position >= images.length) return;
+            index = position;
+            var current = images[index];
+            previous.disabled = index === 0; next.disabled = index === images.length - 1;
+            if (!initial) {
+                record.title_node.textContent = prefix + (current.name || HF.tr('Image'));
+                HF.window_manager.render_taskbar();
+            }
+            clearImage(); error.style.display = 'none';
+            var loading = image = HF.Util.createElement('img', '');
+            loading.alt = current.name || ''; loading.style.display = 'none'; loading.draggable = false;
+            loading.onload = function() {
+                if (record.closed || image !== loading) return;
+                error.style.display = 'none'; loading.style.display = 'block'; paint();
+            };
+            loading.onerror = function() {
+                if (record.closed || image !== loading) return;
+                loading.style.display = 'none'; error.style.display = 'block';
+            };
+            viewport.appendChild(loading);
+            loading.src = HF.file_io(current).inlineURL(current.path) + '&v=' + encodeURIComponent(current.mtime || 0);
+        }
+        show(index, true);
         return record;
     }
 

@@ -144,6 +144,49 @@
     object-fit: contain;
 }
 
+.fm-image-viewport{
+    position: relative;
+    flex: 1 1 auto;
+    display: flex;
+    min-width: 0;
+    min-height: 0;
+    height: 100%;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    touch-action: none;
+    overscroll-behavior: contain;
+    user-select: none;
+}
+
+.fm-image-viewport img{
+    flex-shrink: 0;
+    transform-origin: center;
+}
+
+.fm-image-viewport.is-zoomed{
+    cursor: grab;
+}
+
+.fm-image-viewport.is-zoomed.is-dragging{
+    cursor: grabbing;
+}
+
+.fm-image-navigation{
+    display: inline-flex;
+    flex: 0 0 auto;
+    gap: 2px;
+    margin-right: 8px;
+}
+
+.fm-image-navigation .fm-image-nav:disabled{
+    pointer-events: auto;
+    opacity: .3;
+    cursor: default;
+    background: transparent;
+    color: var(--fm-muted);
+}
+
 .fm-window-pdf-stage iframe,
 
 .fm-window-video-stage video{
