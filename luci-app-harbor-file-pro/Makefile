@@ -19,8 +19,6 @@ define Build/Prepare/$(PKG_NAME)
 	$(SED) "s/^const harbor_asset_version = '[^']*';/const harbor_asset_version = '$(PKG_VERSION)';/" $(PKG_BUILD_DIR)/root/usr/share/ucode/luci/template/harbor_file_pro/index.ut
 endef
 
-include $(TOPDIR)/feeds/luci/luci.mk
-
 define Package/$(PKG_NAME)/conffiles
 /etc/config/harbor_file_pro
 endef
@@ -91,4 +89,6 @@ rm -rf /tmp/luci-modulecache/
 exit 0
 endef
 
-$(eval $(call BuildPackage,$(PKG_NAME)))
+include $(TOPDIR)/feeds/luci/luci.mk
+
+# call BuildPackage - OpenWrt buildroot signature
