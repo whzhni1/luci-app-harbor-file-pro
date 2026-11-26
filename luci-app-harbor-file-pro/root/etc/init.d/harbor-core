@@ -1,0 +1,185 @@
+#!/bin/sh /etc/rc.common
+# Harbor File Pro service (procd, shipped by luci-app-harbor-file-pro)
+
+USE_PROCD=1
+START=95
+STOP=10
+
+extra_command "sync_cron" "Rewrite the automatic update cron entry from the current config"
+extra_command "sync_wan" "Apply the WAN access firewall rule from the current config"
+
+DEFAULT_CONFIG=harbor_file_pro
+CRON_FILE="/etc/crontabs/root"
+CRON_TAG="harbor_auto_update"
+
+cfg_file_path() {
+	local ptr
+	ptr=$(uci -q get $DEFAULT_CONFIG.main.config_file 2>/dev/null)
+	case "$ptr" in
+		/etc/config/*) echo "$ptr" ;;
+		*) echo "/etc/config/$DEFAULT_CONFIG" ;;
+	esac
+}
+
+CFG_FILE="$(cfg_file_path)"
+CFG_NAME="$(basename "$CFG_FILE")"
+
+cfg_get() {
+	uci -q get "$CFG_NAME.main.$1" 2>/dev/null
+}
+
+cfg_or() {
+	local v
+	v="$(cfg_get "$1")"
+	[ -n "$v" ] && echo "$v" || echo "$2"
+}
+
+bin_dir()    { cfg_or bin_dir /usr/sbin; }
+state_dir()  { cfg_or state_dir /etc/harbor; }
+prog_path()  { echo "$(bin_dir)/harbor-core"; }
+
+is_enabled() {
+	[ "$(cfg_or enabled 1)" = "0" ] && return 1
+	return 0
+}
+
+listen_address() {
+	local listen port
+	listen="$(cfg_or listen 0.0.0.0)"
+	port="$(cfg_or port 9700)"
+	case "$listen" in *:*) case "$listen" in \[*) ;; *) listen="[$listen]" ;; esac ;; esac
+	echo "$listen:$port"
+}
+
+num_or() {
+	local v="$1" d="$2"
+	case "$v" in ''|*[!0-9]*) echo "$d" ;; *) echo "$v" ;; esac
+}
+
+sync_wan() {
+	local wan port cur changed=0
+	wan="$(cfg_or wan_access 0)"
+	port="$(cfg_or port 9700)"
+	cur="$(uci -q get firewall.harbor_wan.dest_port 2>/dev/null)"
+	if [ "$wan" = "1" ]; then
+		if [ "$cur" != "$port" ] || [ "$(uci -q get firewall.harbor_wan.target 2>/dev/null)" != "ACCEPT" ]; then
+			uci set firewall.harbor_wan=rule
+			uci set firewall.harbor_wan.name='Harbor File Pro WAN'
+			uci set firewall.harbor_wan.src='wan'
+			uci set firewall.harbor_wan.proto='tcp'
+			uci set firewall.harbor_wan.dest_port="$port"
+			uci set firewall.harbor_wan.target='ACCEPT'
+			uci commit firewall
+			changed=1
+		fi
+	else
+		if [ -n "$cur" ] || uci -q get firewall.harbor_wan >/dev/null 2>&1; then
+			uci -q delete firewall.harbor_wan
+			uci commit firewall
+			changed=1
+		fi
+	fi
+	[ "$changed" = "1" ] && /etc/init.d/firewall reload >/dev/null 2>&1
+	return 0
+}
+
+sync_cron() {
+	local auto interval update_time hour minute line tmp changed=0
+	auto="$(cfg_or auto_update 0)"
+	interval="$(num_or "$(cfg_get update_interval)" 7)"
+	[ "$interval" -ge 1 ] 2>/dev/null && [ "$interval" -le 30 ] 2>/dev/null || interval=7
+	update_time="$(cfg_or update_time 04:00)"
+	case "$update_time" in
+		[0-2][0-9]:[0-5][0-9])
+			hour="${update_time%:*}"
+			minute="${update_time#*:}"
+			case "$hour" in 2[4-9]) hour=04; minute=00 ;; esac
+			;;
+		*) hour=04; minute=00 ;;
+	esac
+	hour="${hour#0}"; minute="${minute#0}"
+	[ -n "$hour" ] || hour=0
+	[ -n "$minute" ] || minute=0
+	line="$minute $hour */$interval * * /usr/libexec/harbor/harbor-update.sh auto # $CRON_TAG"
+	mkdir -p "$(dirname "$CRON_FILE")"
+	touch "$CRON_FILE"
+	tmp="$(mktemp)"
+	grep -v "$CRON_TAG" "$CRON_FILE" > "$tmp" 2>/dev/null
+	if [ "$auto" = "1" ]; then
+		echo "$line" >> "$tmp"
+	fi
+	if ! cmp -s "$tmp" "$CRON_FILE"; then
+		cat "$tmp" > "$CRON_FILE"
+		changed=1
+	fi
+	rm -f "$tmp"
+	[ "$changed" = "1" ] && /etc/init.d/cron restart >/dev/null 2>&1
+	return 0
+}
+
+seed_config() {
+	local def="/etc/config/$DEFAULT_CONFIG" donor f
+	[ "$CFG_FILE" = "$def" ] && return 0
+	[ -f "$CFG_FILE" ] && return 0
+	donor=""
+	for f in $(ls -t /etc/config/* 2>/dev/null); do
+		[ "$f" = "$CFG_FILE" ] && continue
+		if grep -q "config_file[[:space:]]*['\"]$CFG_FILE['\"]" "$f" 2>/dev/null; then
+			donor="$f"
+			break
+		fi
+	done
+	[ -n "$donor" ] || donor="$def"
+	[ -f "$donor" ] && cp "$donor" "$CFG_FILE" 2>/dev/null
+	return 0
+}
+
+start_service() {
+	local prog state respawn_en respawn_th respawn_to respawn_re dev_mode
+	seed_config
+	sync_wan
+	sync_cron
+	is_enabled || return 0
+	prog="$(prog_path)"
+	state="$(state_dir)"
+	if [ ! -x "$prog" ]; then
+		logger -t harbor-core "binary not installed at $prog, skip start (install it from LuCI)"
+		return 0
+	fi
+	mkdir -p "$state" /usr/share/harbor
+	chmod 700 "$state"
+	procd_open_instance
+	procd_set_param command "$prog" serve \
+		--config "$CFG_FILE" \
+		--state-dir "$state" \
+		--listen "$(listen_address)"
+	dev_mode="$(cfg_or dev_mode 0)"
+	if [ "$dev_mode" != "0" ]; then
+		procd_append_param command --dev
+	fi
+	respawn_en="$(cfg_or respawn_enabled 1)"
+	if [ "$respawn_en" != "0" ]; then
+		respawn_th="$(num_or "$(cfg_get respawn_threshold)" 3600)"
+		respawn_to="$(num_or "$(cfg_get respawn_timeout)" 5)"
+		respawn_re="$(num_or "$(cfg_get respawn_retry)" 5)"
+		procd_set_param respawn "$respawn_th" "$respawn_to" "$respawn_re"
+	fi
+	procd_set_param file "$CFG_FILE"
+	procd_set_param limits nofile="4096 4096"
+	procd_set_param stdout 1
+	procd_set_param stderr 1
+	procd_close_instance
+}
+
+reload_service() {
+	stop
+	start
+}
+
+service_triggers() {
+	# Any applied UCI change (LuCI "Save & Apply", /sbin/reload_config) rewrites
+	# the auto-update cron entry and re-syncs the WAN allow rule so both take
+	# effect immediately without a service restart.
+	procd_add_raw_trigger "config.change" 1000 /etc/init.d/harbor-core sync_cron
+	procd_add_raw_trigger "config.change" 1000 /etc/init.d/harbor-core sync_wan
+}

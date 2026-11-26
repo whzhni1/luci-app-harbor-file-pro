@@ -1,0 +1,48 @@
+#!/bin/sh
+# Harbor File Pro first-install setup
+
+mkdir -p /etc/harbor /usr/share/harbor
+chmod 700 /etc/harbor
+chmod 600 /etc/config/harbor_file_pro 2>/dev/null
+
+clean_legacy_keys() {
+	local cur legacy
+	[ -f "/etc/config/$1" ] || return 0
+	uci -q get "$1.main" >/dev/null 2>&1 || return 0
+	uci -q delete "$1.main.compat_base" 2>/dev/null
+	cur="$(uci -q get $1.main.update_mirror 2>/dev/null)"
+	case "$cur" in
+		github|gitlab|gitee|cloudflare|auto) ;;
+		*)
+			legacy="$(uci -q get $1.main.harbor_update_mirror 2>/dev/null)"
+			case "$legacy" in
+				github|gitlab|gitee|cloudflare|auto) cur="$legacy" ;;
+				*)
+					legacy="$(uci -q get $1.main.mirror 2>/dev/null)"
+					case "$legacy" in
+						github|gitlab|gitee|cloudflare) cur="$legacy" ;;
+						*) cur="auto" ;;
+					esac
+					;;
+			esac
+			uci -q set "$1.main.update_mirror=$cur"
+			;;
+	esac
+	uci -q delete "$1.main.harbor_update_mirror" 2>/dev/null
+	uci -q commit "$1"
+}
+
+clean_legacy_keys harbor_file_pro
+_ptr="$(uci -q get harbor_file_pro.main.config_file 2>/dev/null)"
+case "$_ptr" in
+	/etc/config/*)
+		_name="${_ptr#/etc/config/}"
+		[ "$_name" != "harbor_file_pro" ] && clean_legacy_keys "$_name"
+		;;
+esac
+[ -n "$_ptr" ] && [ -f "$_ptr" ] && chmod 600 "$_ptr"
+
+[ -x /etc/init.d/harbor-core ] && /etc/init.d/harbor-core enable
+rm -f /tmp/luci-indexcache /tmp/luci-indexcache.*
+rm -rf /tmp/luci-modulecache
+exit 0

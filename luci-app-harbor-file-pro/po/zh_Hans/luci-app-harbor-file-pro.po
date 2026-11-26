@@ -1,0 +1,546 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: luci-app-harbor-file-pro\n"
+"Language: zh_Hans\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+msgid "%(days)sd %(clock)s"
+msgstr "%(days)s天%(clock)s"
+
+msgid "0 automatic (max 4 threads) manually up to 16 threads."
+msgstr "0 自动（最多 4 线程）手动指定最多16线程。"
+
+msgid "0 disables idle logout."
+msgstr "0 禁用空闲登出。"
+
+msgid "Access scope"
+msgstr "访问范围"
+
+msgid "Accessible roots"
+msgstr "可访问根目录"
+
+msgid "Account"
+msgstr "账号"
+
+msgid "Action failed"
+msgstr "操作失败"
+
+msgid "Administrator account is not initialized yet. "
+msgstr "管理员账号尚未初始化。"
+
+msgid "Advanced"
+msgstr "高级"
+
+msgid "Allow WAN access"
+msgstr "允许 WAN 访问"
+
+msgid "Allowed"
+msgstr "已放行"
+
+msgid "Auto"
+msgstr "自动"
+
+msgid "Used for Core and LuCI updates. Auto selects an available mirror."
+msgstr "供内核与 LuCI 更新共用。自动模式自动选择可用镜像。"
+
+msgid "Automatic updates"
+msgstr "自动更新"
+
+msgid "Automatically restart the core after crashes (procd respawn)."
+msgstr "内核崩溃后自动重启（procd respawn）。"
+
+msgid "Body idle timeout (s)"
+msgstr "请求体空闲超时（秒）"
+
+msgid "Cancel"
+msgstr "取消"
+
+msgid "Changes take effect after Save & Apply restarts the service."
+msgstr "修改在「保存并应用」重启服务后生效。"
+
+msgid "Check"
+msgstr "检查"
+
+msgid "Check complete"
+msgstr "检查完成"
+
+msgid "Check failed"
+msgstr "检查失败"
+
+msgid "Checking for updates…"
+msgstr "正在检查更新…"
+
+msgid "Chunk limit (bytes)"
+msgstr "分片上限（字节）"
+
+msgid "Chunk size (bytes)"
+msgstr "分片大小（字节）"
+
+msgid "Common"
+msgstr "常用"
+
+msgid "Config file"
+msgstr "配置文件"
+
+msgid "Core architecture"
+msgstr "内核架构"
+
+msgid "Core binary directory"
+msgstr "内核文件目录"
+
+msgid "Core not installed"
+msgstr "内核未安装"
+
+msgid "Core not installed. Download and install it from the core version card below."
+msgstr "内核未安装，请在下方内核版本卡中下载安装。"
+
+msgid "Core version"
+msgstr "内核版本"
+
+msgid "Danger zone"
+msgstr "危险区"
+
+msgid "Developer mode"
+msgstr "开发者模式"
+
+msgid "Directories the file panel may access. Leave empty to allow the whole filesystem."
+msgstr "文件面板可访问的目录；留空表示允许访问整个文件系统。"
+
+msgid "Directory containing the harbor-core binary. Changing it takes effect after restart; download the core again if the binary is not there."
+msgstr "存放 harbor-core 二进制的目录；变更后重启生效，若该目录下没有二进制请重新下载内核。"
+
+msgid "Effective configuration"
+msgstr "生效配置"
+
+msgid "Enable respawn"
+msgstr "启用 respawn"
+
+msgid "Enable service"
+msgstr "启用服务"
+
+msgid "Failed"
+msgstr "失败"
+
+msgid "Failed to load logs"
+msgstr "日志加载失败"
+
+msgid "Failed to start update"
+msgstr "更新启动失败"
+
+msgid "Harbor File Pro"
+msgstr "Harbor 文件管理 Pro"
+
+msgid "Harbor File Pro Settings"
+msgstr "Harbor 文件管理 Pro 设置"
+
+msgid "Health"
+msgstr "健康状态"
+
+msgid "Initialization failed"
+msgstr "初始化失败"
+
+msgid "Initialize and start"
+msgstr "初始化并启动"
+
+msgid "Initialized · 2FA disabled"
+msgstr "已初始化 · 2FA 未启用"
+
+msgid "Initialized · 2FA enabled"
+msgstr "已初始化 · 2FA 已启用"
+
+msgid "Initializing…"
+msgstr "正在初始化…"
+
+msgid "Invalid username"
+msgstr "用户名不合法"
+
+msgid "LAN + WAN"
+msgstr "局域网 + WAN"
+
+msgid "LAN only"
+msgstr "仅局域网"
+
+msgid "Latest"
+msgstr "最新"
+
+msgid "Lightweight file server · WebDAV / S3"
+msgstr "轻量文件服务 · WebDAV / S3"
+
+msgid "Listen"
+msgstr "监听"
+
+msgid "Listen address"
+msgstr "监听地址"
+
+msgid "Loading…"
+msgstr "加载中…"
+
+msgid "LuCI package"
+msgstr "LuCI 软件包"
+
+msgid "Max concurrent transfers"
+msgstr "最大并发传输"
+
+msgid "Max connections"
+msgstr "最大连接数"
+
+msgid "Maximum number of automatic restarts; 0 unlimited."
+msgstr "自动重启的最大次数；0 不限次数。"
+
+msgid "Must be a file under /etc/config/"
+msgstr "必须位于 /etc/config/ 下"
+
+msgid "Must be a file under /etc/config/. Changing it copies the current configuration to the new file and rebinds the service."
+msgstr "必须位于 /etc/config/ 下；变更时自动把当前配置复制到新文件并重新绑定服务。"
+
+msgid "Must be an absolute path"
+msgstr "必须是绝对路径"
+
+msgid "No data"
+msgstr "暂无数据"
+
+msgid "No logs"
+msgstr "暂无日志"
+
+msgid "Not allowed"
+msgstr "未放行"
+
+msgid "Not checked"
+msgstr "未检查"
+
+msgid "Not initialized"
+msgstr "未初始化"
+
+msgid "Not installed"
+msgstr "未安装"
+
+msgid "Only enable when the panel is served over HTTPS."
+msgstr "仅当面板通过 HTTPS 访问时才开启。"
+
+msgid "Open web panel"
+msgstr "打开 Web 面板"
+
+msgid "Overview"
+msgstr "概览"
+
+msgid "Panel address"
+msgstr "面板地址"
+
+msgid "Password"
+msgstr "密码"
+
+msgid "Password must be 6–128 characters"
+msgstr "密码须为 6–128 个字符"
+
+msgid "Paths"
+msgstr "路径"
+
+msgid "Periodically checks and installs core and LuCI updates via cron."
+msgstr "通过 cron 定期检查并安装内核与 LuCI 更新。"
+
+msgid "Port"
+msgstr "端口"
+
+msgid "Reachable from WAN"
+msgstr "可从 WAN 访问"
+
+msgid "Recent logs"
+msgstr "最近日志"
+
+msgid "Refresh logs"
+msgstr "刷新日志"
+
+msgid "Clear logs"
+msgstr "清空日志"
+
+msgid "Logs cleared"
+msgstr "日志已清空"
+
+msgid "Failed to clear logs"
+msgstr "清空日志失败"
+
+msgid "Release file"
+msgstr "Release 文件"
+
+msgid "Renew session on activity"
+msgstr "活动时续期会话"
+
+msgid "Request timeout (s)"
+msgstr "请求超时（秒）"
+
+msgid "Reset"
+msgstr "重置"
+
+msgid "Reset authentication"
+msgstr "重置认证"
+
+msgid "Respawn retries"
+msgstr "Respawn 重试次数"
+
+msgid "Respawn threshold (s)"
+msgstr "Respawn 阈值（秒）"
+
+msgid "Respawn timeout (s)"
+msgstr "Respawn 超时（秒）"
+
+msgid "Restart"
+msgstr "重启"
+
+msgid "Restarting…"
+msgstr "正在重启…"
+
+msgid "Running %(time)s"
+msgstr "已运行%(time)s"
+
+msgid "Run print-config"
+msgstr "运行 print-config"
+
+msgid "Running"
+msgstr "运行中"
+
+msgid "Running…"
+msgstr "运行中…"
+
+msgid "Runs print-config on the device and shows the effective configuration the core will use."
+msgstr "在设备上运行 print-config，显示内核实际使用的生效配置。"
+
+msgid "Secure cookie"
+msgstr "Secure Cookie"
+
+msgid "Service status"
+msgstr "服务状态"
+
+msgid "Session idle timeout (s)"
+msgstr "会话空闲超时（秒）"
+
+msgid "Session lifetime (s)"
+msgstr "会话有效期（秒）"
+
+msgid "Set an administrator account first"
+msgstr "请先设置管理员账号"
+
+msgid "Set the administrator account for the Harbor web panel."
+msgstr "为 Harbor Web 面板设置管理员账号。"
+
+msgid "Set up administrator account"
+msgstr "设置管理员账号"
+
+msgid "Set up now"
+msgstr "立即设置"
+
+msgid "Settings"
+msgstr "设置"
+
+msgid "Start"
+msgstr "启动"
+
+msgid "Starting…"
+msgstr "正在启动…"
+
+msgid "State directory"
+msgstr "状态目录"
+
+msgid "Stop"
+msgstr "停止"
+
+msgid "Stopped"
+msgstr "已停止"
+
+msgid "Stopping…"
+msgstr "正在停止…"
+
+msgid "Stores the administrator account and secrets. Changing it does NOT migrate existing account data; the panel will ask to initialize again."
+msgstr "存放管理员账号与密钥；变更不会迁移旧账号数据，面板将要求重新初始化。"
+
+msgid "Light"
+msgstr "浅色"
+
+msgid "Dark"
+msgstr "深色"
+
+msgid "This clears the administrator password and 2FA. You will need to set up the account again. Continue?"
+msgstr "将清除管理员密码与 2FA，需要重新设置账号。继续？"
+
+msgid "This stops the service and removes the core binary. Configuration and data are kept. Continue?"
+msgstr "将停止服务并删除内核二进制，配置与数据保留。继续？"
+
+msgid "Time window in seconds in which repeated daemon exits are counted as crashes."
+msgstr "在该时间窗口（秒）内，核心进程反复退出会被计为崩溃。"
+
+msgid "Transfer history entries"
+msgstr "传输历史条数"
+
+msgid "Unable to fetch release information"
+msgstr "无法获取发布信息"
+
+msgid "Uninstall"
+msgstr "卸载"
+
+msgid "Uninstall core"
+msgstr "卸载内核"
+
+msgid "Up to date"
+msgstr "已是最新"
+
+msgid "Update"
+msgstr "更新"
+
+msgid "Update available"
+msgstr "有可用更新"
+
+msgid "Update complete"
+msgstr "更新完成"
+
+msgid "Update interval (days)"
+msgstr "更新间隔（天）"
+
+msgid "Updating, please do not close this page…"
+msgstr "正在更新，请勿关闭页面…"
+
+msgid "Upload session lifetime (h)"
+msgstr "上传会话有效期（小时）"
+
+msgid "Username"
+msgstr "用户名"
+
+msgid "Version"
+msgstr "版本"
+
+msgid "WAN access"
+msgstr "WAN 访问"
+
+msgid "Wait time in seconds before restarting the daemon after it exits."
+msgstr "核心进程退出后，重新拉起前等待的秒数。"
+
+msgid "When enabled, the service is accessible from the public network."
+msgstr "开启后可从公网访问"
+
+msgid "Update mirror"
+msgstr "更新镜像"
+
+msgid "Worker threads"
+msgstr "工作线程"
+
+msgid "Working…"
+msgstr "正在处理…"
+
+msgid "auto = automatic detection, or specify manually e.g. armv7 musleabihf."
+msgstr "auto 为自动识别，也可手动指定如 armv7 musleabihf。"
+
+msgid "Detected:"
+msgstr "识别结果："
+
+msgid "loading…"
+msgstr "加载中…"
+
+msgid "Configuration migration failed"
+msgstr "配置迁移失败"
+
+msgid "The new config file could not be activated. The previous configuration is still in use."
+msgstr "新配置文件未能生效，仍在使用之前的配置。"
+
+msgid "Root access policy"
+msgstr "根目录访问策略"
+
+msgid "Whitelist and blacklist are mutually exclusive. The core refuses to start if both lists are non-empty, so saving clears the hidden list."
+msgstr "白名单与黑名单互斥；两个列表同时非空时内核会拒绝启动，保存时会自动清空未显示的列表。"
+
+msgid "Unrestricted (whole filesystem)"
+msgstr "不限制（整个文件系统）"
+
+msgid "Whitelist (allow only listed roots)"
+msgstr "白名单（仅允许列表内目录）"
+
+msgid "Blacklist (block listed roots)"
+msgstr "黑名单（屏蔽列表内目录）"
+
+msgid "Only paths inside these roots may be accessed."
+msgstr "仅允许访问这些目录之内的路径。"
+
+msgid "Blocked roots"
+msgstr "屏蔽目录（黑名单）"
+
+msgid "These roots and everything under them are blocked."
+msgstr "这些目录及其全部子目录都会被屏蔽。"
+
+msgid "Root policy"
+msgstr "根目录策略"
+
+msgid "Whitelist"
+msgstr "白名单"
+
+msgid "Blacklist"
+msgstr "黑名单"
+
+msgid "Unrestricted"
+msgstr "不限制"
+
+msgid "Listen address and port"
+msgstr "监听地址和端口"
+
+msgid "Enter an address and port, for example 0.0.0.0:9700 or [::]:9700."
+msgstr "请输入地址和端口，例如 0.0.0.0:9700 或 [::]:9700。"
+
+msgid "Initialization is still running. Check the service status later."
+msgstr "初始化仍在进行中，请稍后查看服务状态。"
+
+msgid "Initialization status is unknown. Check the service status before retrying."
+msgstr "初始化状态未知，请先查看服务状态再重试。"
+
+msgid "Migration failed or timed out. Check the active config before retrying."
+msgstr "配置迁移失败或超时。重试前请检查当前使用的配置。"
+
+msgid "Update time"
+msgstr "更新时间"
+
+msgid "Loads web assets from ./assets on disk and shows a DEV badge. For development only."
+msgstr "从磁盘 ./assets 加载界面资源并显示 DEV 标识，仅供开发调试。"
+
+msgid "Local time in 24-hour format, for example 00:00."
+msgstr "使用本地 24 小时时间，例如 00:00。"
+
+msgid "Enter a time in 24-hour HH:MM format."
+msgstr "请输入 24 小时制时间，格式为 HH:MM。"
+
+msgid "Failed to load settings. Please reload the page."
+msgstr "设置加载失败，请刷新页面重试。"
+
+msgid "Settings are still loading. Please wait."
+msgstr "设置仍在加载，请稍候。"
+
+msgid "Settings saved"
+msgstr "设置已保存"
+
+msgid "The firewall rule has been updated."
+msgstr "防火墙规则已更新。"
+
+msgid "The selected policy decides the access rules."
+msgstr "所选策略决定访问规则。"
+
+msgid "The selected policy requires at least one directory."
+msgstr "所选策略至少需要一个目录。"
+
+msgid "The service has been stopped."
+msgstr "服务已停止。"
+
+msgid "The service is restarting to apply changes."
+msgstr "服务正在重启以生效。"
+
+msgid "Start a compatible core before saving this policy with retained directories."
+msgstr "请先启动支持保留两份目录列表的内核，再保存此策略。"
+
+msgid "Core installation and updates are temporarily unavailable."
+msgstr "内核安装和更新暂不可用。"
+
+msgid "Failed to query update status"
+msgstr "查询更新状态失败"
+
+msgid "Periodically checks and installs Core updates via cron."
+msgstr "通过定时任务定期检查并安装内核更新。"
+
+msgid "Also update the LuCI package"
+msgstr "同时更新 LuCI 软件包"
+
+msgid "Update failed"
+msgstr "更新失败"

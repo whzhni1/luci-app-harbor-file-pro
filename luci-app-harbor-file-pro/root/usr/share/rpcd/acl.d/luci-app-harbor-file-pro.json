@@ -1,61 +1,34 @@
 {
-	"luci-app-harbor-file-pro": {
-		"description": "Grant filesystem access to the HarborFile manager (streams via /cgi-bin/harbor-io-pro, not cgi-io)",
-		"read": {
-			"file": {
-				"/": [
-					"list"
-				],
-				"/*": [
-					"list",
-					"read"
-				]
-			},
-			"ubus": {
-				"file": [
-					"list",
-					"read",
-					"stat"
-				],
-				"harbor.file": [
-					"read"
-				],
-				"luci": [
-					"getFeatures"
-				],
-				"session": [
-					"access"
-				],
-				"system": [
-					"info",
-					"board"
-				]
-			},
-			"uci": [
-				"harbor_file_pro",
-				"ttyd",
-				"uhttpd"
-			]
-		},
-		"write": {
-			"file": {
-				"/*": [
-					"write"
-				]
-			},
-			"ubus": {
-				"file": [
-					"exec",
-					"remove",
-					"write"
-				],
-				"harbor.file": [
-					"write"
-				]
-			},
-			"uci": [
-				"harbor_file_pro"
-			]
-		}
-	}
+    "luci-app-harbor-file-pro": {
+        "description": "Harbor File Pro management",
+        "read": {
+            "uci": [ "harbor_file_pro" ],
+            "ubus": {
+                "luci.harbor-file-pro": [
+                    "status",
+                    "init_account_status",
+                    "job_status",
+                    "logs",
+                    "get_paths",
+                    "print_config",
+                    "get_theme",
+                    "get_upstream_version",
+                    "get_update_status"
+                ]
+            }
+        },
+        "write": {
+            "uci": [ "harbor_file_pro" ],
+            "ubus": {
+                "luci.harbor-file-pro": [
+                    "action",
+                    "clear_logs",
+                    "init_account",
+                    "migrate_config",
+                    "set_theme",
+                    "do_update"
+                ]
+            }
+        }
+    }
 }

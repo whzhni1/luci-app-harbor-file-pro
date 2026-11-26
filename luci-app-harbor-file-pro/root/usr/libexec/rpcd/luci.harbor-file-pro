@@ -1,0 +1,640 @@
+#!/usr/bin/ucode
+// Harbor File Pro LuCI backend (fixed ubus methods only)
+
+'use strict';
+
+import { readfile, writefile, stat, popen, mkdir, unlink, rmdir, open, glob, rename } from "fs";
+import { cursor } from "uci";
+
+const UPDATE_SCRIPT = "/usr/libexec/harbor/harbor-update.sh";
+const UPDATE_DIR = "/tmp/harbor_update";
+const CORE_UPDATE_ROOT = "/tmp/harbor-core-update";
+const LOG_SCRIPT = "/usr/libexec/harbor/harbor-logs.sh";
+const SERVICE_LOG = "/tmp/harbor-core-logs/service.log";
+const INIT_SCRIPT = "/etc/init.d/harbor-core";
+const DEFAULT_CFG = "harbor_file_pro";
+const AUTH_JOB = "/tmp/harbor-auth-init";
+const JOB_ROOT = "/tmp/harbor-rpc-jobs";
+const RPC_SCRIPT = "/usr/libexec/rpcd/luci.harbor-file-pro";
+
+function shQuote(s) {
+    return "'" + replace(`${s || ""}`, /'/g, "'\\''") + "'";
+}
+
+function systemCmd(cmd) {
+    let p = popen(cmd, "r");
+    if (!p) return -1;
+    p.read("all");
+    return p.close();
+}
+
+function execOutput(cmd) {
+    let p = popen(cmd, "r");
+    let out = p ? p.read("all") : "";
+    if (p) p.close();
+    return out ? out : "";
+}
+
+function runDetached(cmd) {
+    systemCmd(`if command -v setsid >/dev/null 2>&1; then setsid sh -c ${shQuote(cmd)}; else sh -c ${shQuote(cmd)}; fi </dev/null >/dev/null 2>&1 &`);
+}
+
+function fileExists(path) {
+    return stat(path) != null;
+}
+
+function isExecutable(path) {
+    let s = stat(path);
+    return s != null && s.perm != null && s.perm.user_exec === true;
+}
+
+function validDir(s, fallback) {
+    let v = `${s || ""}`;
+    return match(v, /^\/[A-Za-z0-9\/._-]+$/) ? v : fallback;
+}
+
+function activeCfgName(u) {
+    let ptr = u.get(DEFAULT_CFG, "main", "config_file") || "";
+    if (substr(ptr, 0, 12) === "/etc/config/" && length(ptr) > 12)
+        return substr(ptr, 12);
+    return DEFAULT_CFG;
+}
+
+function loadCfg() {
+    let u = cursor();
+    u.load(DEFAULT_CFG);
+    let name = activeCfgName(u);
+    if (name !== DEFAULT_CFG)
+        u.load(name);
+    let get = function(k) { return u.get(name, "main", k) || ""; };
+    return {
+        name: name,
+        file: "/etc/config/" + name,
+        get: get,
+        bin_dir: validDir(get("bin_dir"), "/usr/sbin"),
+        state_dir: validDir(get("state_dir"), "/etc/harbor"),
+        listen: get("listen") || "0.0.0.0",
+        port: int(get("port")) || 9700
+    };
+}
+
+function binPath(cfg) {
+    return cfg.bin_dir + "/harbor-core";
+}
+
+function parseJson(text) {
+    if (!text) return null;
+    try {
+        let v = json(text);
+        return v;
+    } catch (e) {
+        return null;
+    }
+}
+
+function fetchJson(url) {
+    let out = execOutput(sprintf("curl -fsS --connect-timeout 1 --max-time 2 %s 2>/dev/null", shQuote(url)));
+    let v = parseJson(out);
+    if (v && v.data) return v.data;
+    return v;
+}
+
+function loopbackHost(listen) {
+    let h = `${listen || ""}`;
+    if (h === "" || h === "0.0.0.0") return "127.0.0.1";
+    if (h === "::" || h === "[::]") return "[::1]";
+    if (match(h, /^[0-9a-fA-F:]+$/) && index(h, ":") >= 0) return `[${h}]`;
+    return match(h, /^[A-Za-z0-9.-]+$/) ? h : "127.0.0.1";
+}
+
+function pidAlive(pid) {
+    return pid && int(pid) > 0 && fileExists(`/proc/${pid}`);
+}
+
+function getPid() {
+    let out = trim(execOutput("pidof harbor-core 2>/dev/null"));
+    let pid = split(out, " ")[0] || "";
+    return pidAlive(pid) ? pid : "";
+}
+
+function cmdStatus(args) {
+    let cfg = loadCfg();
+    let bin = binPath(cfg);
+    let installed = isExecutable(bin);
+    let pid = installed ? getPid() : "";
+    let host = loopbackHost(cfg.listen);
+    let base = `http://${host}:${cfg.port}`;
+    let health = installed ? fetchJson(`${base}/healthz`) : null;
+    let account = installed ? fetchJson(`${base}/api/v1/auth_status`) : null;
+    let info = installed ? fetchJson(`${base}/api/v1/service_info`) : null;
+    let verInfo = installed ? fetchJson(`${base}/api/v1/version`) : null;
+    if (account && !account.needs_setup && !account.username)
+        account.username = trim(readfile(cfg.state_dir + "/username") || "");
+    let version = "";
+    if (installed) {
+        let out = execOutput(sprintf("%s --version 2>/dev/null", shQuote(bin)));
+        let m = match(out || "", /[0-9]+\.[0-9]+\.[0-9]+/);
+        version = m ? m[0] : "";
+    }
+    let u = cursor();
+    u.load("firewall");
+    let wanActual = (u.get("firewall", "harbor_wan", "target") || "") === "ACCEPT";
+    let luciVersion = trim(execOutput(`${UPDATE_SCRIPT} installed luci-app-harbor-file-pro 2>/dev/null`));
+    return {
+        installed: installed,
+        running: !!pid,
+        pid: pid,
+        version: version,
+        luci_version: luciVersion,
+        health: health,
+        account: account,
+        service_info: info,
+        core_target: verInfo ? (verInfo.build_target || "") : "",
+        listen: cfg.listen,
+        port: cfg.port,
+        address: `http://${host}:${cfg.port}/`,
+        wan_configured: (cfg.get("wan_access") || "0") === "1",
+        wan_actual: wanActual,
+        enabled: (cfg.get("enabled") || "1") !== "0",
+        cfg_name: cfg.name,
+        cfg_file: cfg.file,
+        bin_dir: cfg.bin_dir,
+        state_dir: cfg.state_dir
+    };
+}
+
+function cmdLogs(args) {
+    let lines = int(args.lines) || 100;
+    if (lines < 50) lines = 50;
+    if (lines > 500) lines = 500;
+    let out = "";
+    if (systemCmd(`${LOG_SCRIPT} sync`) === 0)
+        out = execOutput(sprintf("tail -n %d %s 2>/dev/null", lines, shQuote(SERVICE_LOG)));
+    if (!trim(out))
+        out = execOutput(sprintf("logread -e harbor-core 2>/dev/null | tail -n %d", lines));
+    if (!trim(out))
+        out = execOutput(sprintf("logread 2>/dev/null | grep -F harbor-core | tail -n %d", lines));
+    let result = [];
+    for (let line in split(out || "", "\n")) {
+        if (trim(line)) push(result, line);
+    }
+    return { ok: true, lines: result };
+}
+
+function cmdClearLogs(args) {
+    return { ok: systemCmd(`${LOG_SCRIPT} clear`) === 0 };
+}
+
+function cmdAction(args) {
+    let action = `${args.action || ""}`;
+    let cfg = loadCfg();
+    let bin = binPath(cfg);
+    switch (action) {
+        case "start":
+        case "stop":
+        case "restart":
+        case "sync_wan":
+            runDetached(`${INIT_SCRIPT} ${action}`);
+            return { ok: true, pending: true, action: action };
+        case "reset_auth": {
+            if (!isExecutable(bin))
+                return { ok: false, error: "core_not_installed" };
+            runDetached(sprintf("logger -t harbor-luci 'reset-auth requested from LuCI'; %s reset-auth -s %s && %s restart && logger -t harbor-luci 'reset-auth finished'",
+                shQuote(bin), shQuote(cfg.state_dir), INIT_SCRIPT));
+            return { ok: true, pending: true, action: action };
+        }
+        case "uninstall_core": {
+            runDetached(sprintf("%s stop; rm -f %s %s %s",
+                INIT_SCRIPT, shQuote(bin), shQuote(bin + ".bak"), shQuote(cfg.state_dir + "/core-release")));
+            return { ok: true, pending: true, action: action };
+        }
+    }
+    return { ok: false, error: "invalid_action" };
+}
+
+function cmdInitAccount(args) {
+    let cfg = loadCfg();
+    let bin = binPath(cfg);
+    if (!isExecutable(bin))
+        return { ok: false, error: "core_not_installed" };
+    if (fileExists(cfg.state_dir + "/password"))
+        return { ok: false, error: "already_initialized" };
+    let username = `${args.username || ""}`;
+    let password = `${args.password || ""}`;
+    if (!match(username, /^[A-Za-z0-9.\-_@]{2,32}$/) || substr(username, 0, 1) === "-")
+        return { ok: false, error: "invalid_username" };
+    if (length(password) < 6 || length(password) > 128 || match(password, /[\r\n]/))
+        return { ok: false, error: "invalid_password" };
+    if (!mkdir(AUTH_JOB, 448))
+        return { ok: false, error: "init_busy" };
+    if (writefile(AUTH_JOB + "/input", `${username}\n${password}\n${password}\n`) == null ||
+        writefile(AUTH_JOB + "/status", "running\n") == null) {
+        unlink(AUTH_JOB + "/input");
+        unlink(AUTH_JOB + "/status");
+        rmdir(AUTH_JOB);
+        return { ok: false, error: "init_failed" };
+    }
+    runDetached(sprintf("exec 3<%s || exit 1; rm -f %s; %s init-auth -s %s <&3 >/dev/null 2>&1; rc=$?; exec 3<&-; if [ $rc -eq 0 ]; then echo done > %s; %s start >/dev/null 2>&1; else echo error > %s; fi",
+        shQuote(AUTH_JOB + "/input"), shQuote(AUTH_JOB + "/input"), shQuote(bin), shQuote(cfg.state_dir),
+        shQuote(AUTH_JOB + "/status"), INIT_SCRIPT, shQuote(AUTH_JOB + "/status")));
+    return { ok: true, pending: true };
+}
+
+function cmdInitAccountStatus(args) {
+    let status = trim(readfile(AUTH_JOB + "/status") || "");
+    if (status === "running") return { ok: true, pending: true };
+    if (status === "done" || status === "error") {
+        unlink(AUTH_JOB + "/input");
+        unlink(AUTH_JOB + "/status");
+        rmdir(AUTH_JOB);
+        return { ok: status === "done", pending: false, error: status === "done" ? "" : "init_failed" };
+    }
+    return { ok: false, pending: false, error: "init_missing" };
+}
+
+function validConfigPath(p) {
+    return match(p, /^\/etc\/config\/[A-Za-z0-9][A-Za-z0-9._-]*$/) && index(p, "..") < 0;
+}
+
+function cmdMigrateConfig(args) {
+    let from = `${args.from || ""}`;
+    let to = `${args.to || ""}`;
+    if (!validConfigPath(from) || !validConfigPath(to))
+        return { ok: false, error: "invalid_path" };
+    if (from === to)
+        return { ok: true, migrated: false };
+    if (!fileExists(from))
+        return { ok: false, error: "source_missing" };
+    let rc = systemCmd(sprintf("cp -f %s %s", shQuote(from), shQuote(to)));
+    if (rc !== 0)
+        return { ok: false, error: "copy_failed" };
+    let newName = substr(to, 12);
+    let u = cursor();
+    u.load(DEFAULT_CFG);
+    u.set(DEFAULT_CFG, "main", "config_file", to);
+    u.commit(DEFAULT_CFG);
+    u.load(newName);
+    if (u.get(newName, "main") != null) {
+        u.set(newName, "main", "config_file", to);
+        u.commit(newName);
+    }
+    return { ok: true, migrated: true };
+}
+
+function cmdGetPaths(args) {
+    let cfg = loadCfg();
+    return {
+        cfg_name: cfg.name,
+        cfg_file: cfg.file,
+        bin_dir: cfg.bin_dir,
+        state_dir: cfg.state_dir,
+        detected_arch: trim(execOutput(`${UPDATE_SCRIPT} detect_arch 2>/dev/null`)),
+        detected_target: trim(execOutput(`${UPDATE_SCRIPT} detect_target 2>/dev/null`))
+    };
+}
+
+function cmdPrintConfig(args) {
+    let cfg = loadCfg();
+    let bin = binPath(cfg);
+    if (!isExecutable(bin))
+        return { ok: false, error: "core_not_installed", output: "" };
+    let out = execOutput(sprintf("%s print-config -c %s -s %s 2>&1", shQuote(bin), shQuote(cfg.file), shQuote(cfg.state_dir)));
+    return { ok: true, output: out || "" };
+}
+
+function cmdGetTheme(args) {
+    let cfg = loadCfg();
+    let t = cfg.get("luci_theme");
+    if (t !== "dark" && t !== "light") t = "auto";
+    return { theme: t };
+}
+
+function cmdSetTheme(args) {
+    let t = `${args.theme || ""}`;
+    if (t !== "dark" && t !== "light" && t !== "auto")
+        return { ok: false, error: "invalid_theme" };
+    let cfg = loadCfg();
+    let u = cursor();
+    u.load(cfg.name);
+    u.set(cfg.name, "main", "luci_theme", t);
+    u.commit(cfg.name);
+    return { ok: true, theme: t };
+}
+
+function updFile(proj, ext) {
+    return `${UPDATE_DIR}/${proj}.${ext}`;
+}
+
+function validProject(proj) {
+    return proj === "harbor-core" || proj === "luci-app-harbor-file-pro";
+}
+
+function normalizeReleases(proj, slim) {
+    let out = [];
+    let rels = slim && slim.releases ? slim.releases : [];
+    let triple = "";
+    let ext = "";
+    if (proj === "harbor-core")
+        triple = trim(execOutput(`${UPDATE_SCRIPT} detect_target 2>/dev/null`));
+    else
+        ext = trim(execOutput("command -v apk >/dev/null 2>&1 && echo apk || echo ipk"));
+    for (let r in rels) {
+        let files = [];
+        let detected = "";
+        let names = r.filenames || [];
+        for (let n in names)
+            push(files, { name: n });
+        if (proj === "harbor-core" && triple) {
+            let m = match(r.tag || "", /[0-9]+\.[0-9]+\.[0-9]+/);
+            let cand = m ? `harbor-core-${m[0]}-${triple}.tar.gz` : "";
+            if (cand && index(names, cand) >= 0)
+                detected = cand;
+        } else if (ext) {
+            for (let n in names) {
+                if (index(n, "i18n") < 0 && substr(n, length(n) - length(ext) - 1) === "." + ext) {
+                    detected = n;
+                    break;
+                }
+            }
+        }
+        push(out, { tag: r.tag || "", version: r.tag || "", files: files, detectedFile: detected });
+    }
+    return out;
+}
+
+function updateBusy(status) {
+    return status === "checking" || status === "downloading" || status === "installing" ||
+        substr(status, 0, 12) === "downloading:";
+}
+
+function cmdGetUpstreamVersion(args) {
+    let proj = `${args.project || ""}`;
+    if (!validProject(proj))
+        return { ok: false, error: "invalid_project", releases: [] };
+    let mirror = `${args.mirror || ""}`;
+    if (mirror !== "" && !match(mirror, /^(github|gitlab|gitee|cloudflare|random|auto)$/))
+        return { ok: false, error: "invalid_mirror", releases: [] };
+    let slim = parseJson(readfile(updFile(proj, "slim.json")) || "");
+    let status = trim(readfile(updFile(proj, "status")) || "");
+    let current = trim(execOutput(sprintf("%s installed %s 2>/dev/null", shQuote(UPDATE_SCRIPT), shQuote(proj))));
+    if (updateBusy(status)) {
+        return {
+            ok: true,
+            pending: true,
+            project: proj,
+            releases: [],
+            current: current,
+            status: status
+        };
+    }
+    if (args.force || !slim) {
+        systemCmd(sprintf("mkdir -p %s", shQuote(UPDATE_DIR)));
+        writefile(updFile(proj, "status"), "checking\n");
+        runDetached(sprintf("HARBOR_CHECK_FORCE=1 %s check %s %s",
+            shQuote(UPDATE_SCRIPT), shQuote(proj), shQuote(mirror)));
+        return {
+            ok: true,
+            pending: true,
+            project: proj,
+            releases: [],
+            current: current,
+            status: "checking"
+        };
+    }
+    return {
+        ok: !!slim,
+        pending: false,
+        project: proj,
+        releases: normalizeReleases(proj, slim),
+        current: current,
+        status: status
+    };
+}
+
+function cmdDoUpdate(args) {
+    let proj = `${args.project || ""}`;
+    let tag = `${args.tag || ""}`;
+    let filename = `${args.filename || ""}`;
+    if (!validProject(proj))
+        return { ok: false, error: "invalid_project" };
+    if (!match(tag, /^v?[0-9][A-Za-z0-9._-]*$/))
+        return { ok: false, error: "invalid_tag" };
+    if (!match(filename, /^[A-Za-z0-9._+-]+$/))
+        return { ok: false, error: "invalid_filename" };
+    if (proj === "harbor-core") {
+        let cfg = loadCfg();
+        let mirror = cfg.get("update_mirror") || cfg.get("mirror") || "auto";
+        if (mirror === "random") mirror = "auto";
+        if (!match(mirror, /^(auto|github|gitlab|gitee|cloudflare)$/)) mirror = "auto";
+        let target = trim(execOutput(sprintf("%s detect_target 2>/dev/null", shQuote(UPDATE_SCRIPT))));
+        let m = match(tag, /^v?([0-9]+\.[0-9]+\.[0-9]+)$/);
+        if (!m || !match(target, /^[a-z0-9_-]+$/) || filename !== `harbor-core-${m[1]}-${target}.tar.gz`)
+            return { ok: false, error: "invalid_core_asset" };
+        let current = trim(execOutput(sprintf("timeout 10 %s installed harbor-core 2>/dev/null", shQuote(UPDATE_SCRIPT))));
+        if (!current && !isExecutable(binPath(cfg))) current = "0.0.0";
+        if (!match(current, /^[0-9]+\.[0-9]+\.[0-9]+$/))
+            return { ok: false, error: "current_version_unavailable" };
+        let common = sprintf("--current-version %s --target %s --mirror %s", shQuote(current), shQuote(target), shQuote(mirror));
+        let check = parseJson(execOutput(sprintf("timeout 18 %s check %s 2>/dev/null", shQuote(UPDATE_SCRIPT), common)));
+        if (!check || !check.ok || !check.update_available || !check.installable || check.asset_name !== filename)
+            return { ok: false, error: "core_update_not_available" };
+        let random = open("/dev/urandom", "r");
+        if (!random) return { ok: false, error: "job_random_failed" };
+        let bytes = random.read(24);
+        random.close();
+        let id = replace(b64enc(bytes || "") || "", /[^A-Za-z0-9]/g, "");
+        if (!match(id, /^[A-Za-z0-9]{20,40}$/)) return { ok: false, error: "job_random_failed" };
+        let result = parseJson(execOutput(sprintf("timeout 15 %s start --task-id %s %s 2>/dev/null", shQuote(UPDATE_SCRIPT), shQuote(id), common)));
+        if (!result || result.task_id !== id || !match(result.state || "", /^(queued|running|succeeded)$/))
+            return { ok: false, error: result && result.error ? result.error : "core_start_failed" };
+        return { ok: true, project: proj, task_id: id };
+    }
+    let slimText = readfile(updFile(proj, "slim.json")) || "";
+    if (index(slimText, filename) < 0)
+        return { ok: false, error: "file_not_in_release" };
+    let fnames = filename;
+    if (proj === "luci-app-harbor-file-pro" && index(filename, "i18n") < 0) {
+        let lang = trim(execOutput(sprintf("%s i18n_asset %s 2>/dev/null", shQuote(UPDATE_SCRIPT), shQuote(proj))));
+        if (lang && lang !== filename && index(slimText, lang) >= 0)
+            fnames = filename + " " + lang;
+    }
+    runDetached(sprintf("%s download %s %s %s", shQuote(UPDATE_SCRIPT), shQuote(proj), shQuote(tag), shQuote(fnames)));
+    return { ok: true, project: proj };
+}
+
+function cmdGetUpdateStatus(args) {
+    let proj = `${args.project || ""}`;
+    if (!validProject(proj))
+        return { ok: false, error: "invalid_project", status: "", log: [] };
+    let taskId = `${args.task_id || ""}`;
+    if (proj === "harbor-core" && taskId) {
+        if (taskId === "last") {
+            let cfg = loadCfg();
+            taskId = trim(readfile(CORE_UPDATE_ROOT + "/last") || "");
+        }
+        if (!match(taskId, /^[A-Za-z0-9_-]{1,64}$/))
+            return { ok: false, error: "invalid_task_id", status: "", log: [] };
+        let result = parseJson(execOutput(sprintf("timeout 6 %s status --task-id %s 2>/dev/null", shQuote(UPDATE_SCRIPT), shQuote(taskId))));
+        if (!result || result.task_id !== taskId || !match(result.state || "", /^(queued|running|succeeded|failed)$/))
+            return { ok: false, error: result && result.error ? result.error : "task_status_failed", status: "", log: [] };
+        let status = result.state === "succeeded" ? "done" : result.state === "failed" ? "error:" + (result.error || "Update failed") : "progress:" + (int(result.progress) || 0);
+        return { ok: true, project: proj, task_id: taskId, state: result.state, status: status, progress: int(result.progress) || 0, log: result.message ? [ result.message ] : [] };
+    }
+    let status = trim(readfile(updFile(proj, "status")) || "");
+    let logText = readfile(updFile(proj, "log")) || "";
+    let lines = split(trim(logText), "\n");
+    if (length(lines) > 80)
+        lines = slice(lines, length(lines) - 80);
+    return { ok: true, project: proj, status: status, log: lines };
+}
+
+const METHODS = {
+    status:               cmdStatus,
+    logs:                 cmdLogs,
+    clear_logs:           cmdClearLogs,
+    action:               cmdAction,
+    init_account:         cmdInitAccount,
+    init_account_status:  cmdInitAccountStatus,
+    migrate_config:       cmdMigrateConfig,
+    get_paths:            cmdGetPaths,
+    print_config:         cmdPrintConfig,
+    get_theme:            cmdGetTheme,
+    set_theme:            cmdSetTheme,
+    get_upstream_version: cmdGetUpstreamVersion,
+    do_update:            cmdDoUpdate,
+    get_update_status:    cmdGetUpdateStatus
+};
+
+const SIGNATURES = {
+    status:               {},
+    logs:                 { lines: "Integer" },
+    clear_logs:           {},
+    action:               { action: "String" },
+    init_account:         { username: "String", password: "String" },
+    init_account_status:  {},
+    migrate_config:       { from: "String", to: "String" },
+    get_paths:            {},
+    print_config:         {},
+    get_theme:            {},
+    set_theme:            { theme: "String" },
+    get_upstream_version: { project: "String", mirror: "String", force: "Boolean" },
+    do_update:            { project: "String", tag: "String", filename: "String" },
+    get_update_status:    { project: "String", task_id: "String" },
+    job_status:           { id: "String" }
+};
+
+const ASYNC_METHODS = {
+    status: true,
+    logs: true,
+    clear_logs: true,
+    action: true,
+    migrate_config: true,
+    get_paths: true,
+    print_config: true,
+    get_upstream_version: true,
+    do_update: true,
+    get_update_status: true
+};
+
+function validJobId(id) {
+    return match(id || "", /^[A-Za-z0-9]{20,40}$/);
+}
+
+function cleanupJob(dir) {
+    unlink(dir + "/request");
+    unlink(dir + "/result.tmp");
+    unlink(dir + "/result");
+    rmdir(dir);
+}
+
+function jobRootReady() {
+    mkdir(JOB_ROOT, 448);
+    let info = stat(JOB_ROOT);
+    return info && info.type === "directory" && info.uid === 0 && (info.mode & 511) === 448;
+}
+
+function cleanupOldJobs() {
+    for (let dir in glob(JOB_ROOT + "/*") || []) {
+        let info = stat(dir);
+        if (info && info.type === "directory" && time() - info.mtime > 900)
+            cleanupJob(dir);
+    }
+}
+
+function startJob(method, args) {
+    if (!jobRootReady()) return { ok: false, error: "job_storage_failed" };
+    cleanupOldJobs();
+    let random = open("/dev/urandom", "r");
+    if (!random) return { ok: false, error: "job_random_failed" };
+    let bytes = random.read(24);
+    random.close();
+    let id = replace(b64enc(bytes || "") || "", /[^A-Za-z0-9]/g, "");
+    if (!validJobId(id)) return { ok: false, error: "job_random_failed" };
+    let dir = JOB_ROOT + "/" + id;
+    if (!mkdir(dir, 448)) return { ok: false, error: "job_storage_failed" };
+    if (writefile(dir + "/request", sprintf("%J", { method: method, args: args })) == null) {
+        cleanupJob(dir);
+        return { ok: false, error: "job_storage_failed" };
+    }
+    runDetached(sprintf("%s worker %s", shQuote(RPC_SCRIPT), shQuote(id)));
+    return { ok: true, job_id: id };
+}
+
+function cmdJobStatus(args) {
+    let id = `${args.id || ""}`;
+    if (!validJobId(id)) return { ok: false, error: "invalid_job" };
+    let dir = JOB_ROOT + "/" + id;
+    if (!fileExists(dir)) return { ok: false, error: "job_missing" };
+    let result = parseJson(readfile(dir + "/result") || "");
+    if (!result) return { ok: true, pending: true };
+    cleanupJob(dir);
+    return { ok: true, pending: false, result: result };
+}
+
+function runJob(id) {
+    if (!validJobId(id) || !jobRootReady()) return;
+    let dir = JOB_ROOT + "/" + id;
+    let request = parseJson(readfile(dir + "/request") || "");
+    unlink(dir + "/request");
+    let result;
+    if (!request || !ASYNC_METHODS[request.method] || !METHODS[request.method]) {
+        result = { ok: false, error: "invalid_job" };
+    } else {
+        try {
+            result = METHODS[request.method](request.args || {});
+        } catch (e) {
+            result = { ok: false, error: "rpc_exception" };
+        }
+    }
+    if (writefile(dir + "/result.tmp", sprintf("%J", result)) != null)
+        rename(dir + "/result.tmp", dir + "/result");
+}
+
+let argv = ARGV;
+switch (argv[0]) {
+    case "list":
+        print(sprintf("%J", SIGNATURES), "\n");
+        break;
+    case "worker":
+        runJob(argv[1]);
+        break;
+    case "call": {
+        let method = argv[1];
+        let input = json(readfile("/dev/stdin") ?? "{}") ?? {};
+        let fn = method === "job_status" ? cmdJobStatus : METHODS[method];
+        if (!fn) {
+            print(sprintf("%J", { error: "Unknown method", code: "unknown_method" }), "\n");
+        } else {
+            try {
+                let ret = ASYNC_METHODS[method] ? startJob(method, input) : fn(input);
+                print(sprintf("%J", ret), "\n");
+            } catch (e) {
+                print(sprintf("%J", { error: `${e}`, code: "rpc_exception" }), "\n");
+            }
+        }
+        break;
+    }
+    default:
+        warn(`Usage: ${argv[0]} {list|call <method>}\n`);
+        exit(1);
+}
