@@ -5,9 +5,6 @@ PKG_VERSION:=2.0.0
 PKG_RELEASE:=1
 PKG_PO_VERSION:=$(PKG_VERSION)-r$(PKG_RELEASE)
 
-LUCI_MINIFY_JS:=0
-LUCI_MINIFY_CSS:=0
-
 PKG_LICENSE:=MIT
 PKG_MAINTAINER:=whzhni1
 
@@ -104,3 +101,4 @@ exit 0
 endef
 
 include $(TOPDIR)/feeds/luci/luci.mk
+$(eval $(call BuildPackage,$(PKG_NAME)))
