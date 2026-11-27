@@ -350,10 +350,6 @@ pick_latest() {
     [ -n "$LATEST_FILE" ]
 }
 
-# Language to auto-install a translation pack for. Mirrors the
-# luci-app-tailscale update.sh (luci_i18n_install) convention: an explicit
-# uci override, else the active LuCI language; anything invalid means
-# "no language pack" and is silently skipped.
 i18n_lang() {
     local lang
     lang="$(uci_get i18n_lang)"
@@ -378,8 +374,6 @@ installed_i18n_asset() {
         echo "$filenames" | grep 'i18n' | grep -F "$slug" | grep -E "\.${EXT}$" | head -1
         return 0
     fi
-    # No translation pack installed yet: pick the one matching the wanted
-    # language from the same release (fresh auto-install, tailscale style).
     lang="$(i18n_lang)"
     [ -n "$lang" ] || return 0
     echo "$filenames" | grep -E "luci-i18n-harbor-file-pro-${lang}[_-][0-9]" | grep -E "\.${EXT}$" | head -1
@@ -441,8 +435,6 @@ cmd_download() {
     for fname in $fnames; do
         case "$fname" in
             *i18n*)
-                # Language packs ride along with the main package; failure is
-                # non-fatal (same i18n_skip convention as luci-app-tailscale).
                 if _download_and_install "$proj" "$fname"; then
                     installed="${installed:+${installed}, }${fname}"
                 else
@@ -775,11 +767,6 @@ core_update_install_transaction() {
         CORE_UPDATE_INSTALL_ERROR=invalid_install_paths; return 1;
     }
     [ ! -L "$dst" ] || { CORE_UPDATE_INSTALL_ERROR=invalid_install_paths; return 1; }
-    staged_dev="$(stat -c %d "$(dirname "$staged")" 2>/dev/null)"
-    dst_dev="$(stat -c %d "$(dirname "$dst")" 2>/dev/null)"
-    [ -n "$staged_dev" ] && [ "$staged_dev" = "$dst_dev" ] || {
-        CORE_UPDATE_INSTALL_ERROR=staging_not_same_filesystem; return 1;
-    }
     if [ -e "$dst" ]; then
         [ -f "$dst" ] || { CORE_UPDATE_INSTALL_ERROR=invalid_install_paths; return 1; }
         cp -p "$dst" "$backup" || { CORE_UPDATE_INSTALL_ERROR=backup_failed; return 1; }
@@ -834,6 +821,7 @@ core_update_install_transaction() {
 
 core_update_check() {
     local current="" target="" mirror="" work source result rc
+    mkdir -p "$CACHE_DIR" 2>/dev/null || true
     core_update_parse_args "$@" && [ -z "$CORE_UPDATE_ID" ] || { core_update_error invalid_arguments; return 1; }
     current="$CORE_UPDATE_CURRENT" target="$CORE_UPDATE_TARGET" mirror="$CORE_UPDATE_MIRROR"
     case " $CORE_TARGETS " in *" $target "*) ;; *) printf '%s\n' '{"error":"unsupported_target"}'; return 1 ;; esac
@@ -905,12 +893,10 @@ core_update_parse_args() {
 }
 
 core_update_prepare() {
-    # The detached worker starts a fresh shell; it still needs BIN_DIR and mirror
-    # from UCI even though task metadata now lives under /tmp.
     load_uci
     [ ! -L "$CORE_UPDATE_ROOT" ] || return 1
     ( umask 077; mkdir -p "$CORE_UPDATE_ROOT" ) || return 1
-    [ -d "$CORE_UPDATE_ROOT" ] && [ "$(stat -c %u "$CORE_UPDATE_ROOT" 2>/dev/null)" = 0 ] || return 1
+    [ -d "$CORE_UPDATE_ROOT" ] || return 1
     chmod 700 "$CORE_UPDATE_ROOT" || return 1
 }
 

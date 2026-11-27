@@ -373,20 +373,12 @@ return view.extend({
     },
 
     handleSave: function(ev) {
-        // Plain "Save" keeps stock LuCI semantics: values are staged only,
-        // nothing is activated until "Save & Apply".
         return this._saveSettings(ev);
     },
 
     handleSaveApply: function(ev, mode) {
         var self = this, before = this._snapshotSettings();
         return this._saveSettings(ev).then(function() {
-            // Start the framework's apply flow exactly like the stock
-            // implementation (modal apply + confirmation countdown + reload),
-            // detached so the button behaviour is unchanged. The service
-            // action is dispatched in the background once the commit has
-            // happened (rpcd runDetached); a failed/rolled-back apply skips
-            // activation.
             var applying = ui.changes.apply(mode == '0');
             Promise.resolve(applying).then(function() {
                 self._applySettings(before);
@@ -422,11 +414,6 @@ return view.extend({
         });
     },
 
-    // Options consumed at daemon start (init script arguments and the core's
-    // startup config load): changing them needs a service restart to take
-    // effect. Update-schedule options (update_mirror/arch/auto_update/...) are
-    // read fresh by harbor-update.sh and cron on every run and must NOT
-    // trigger a restart.
     _restartKeys: [ 'enabled', 'listen', 'port', 'root_policy',
         'root', 'exclude_root', 'workers', 'max_connections', 'max_transfers',
         'request_timeout', 'bin_dir', 'config_file', 'state_dir', 'session_ttl',
@@ -434,8 +421,6 @@ return view.extend({
         'chunk_limit', 'upload_session_hours', 'transfer_history', 'secure_cookie',
         'respawn_enabled', 'respawn_threshold', 'respawn_timeout', 'respawn_retry',
         'dev_mode' ],
-    // Firewall-only: the WAN allow rule is applied in place by the init
-    // script's sync_wan (firewall reload) without touching the daemon.
     _firewallKeys: [ 'wan_access' ],
 
     _snapshotSettings: function() {
@@ -466,8 +451,6 @@ return view.extend({
         if (!restart && !firewall)
             return;
         if (!restart) {
-            // Only the WAN allow rule changed: apply it via init sync_wan
-            // (firewall reload) and keep the daemon running.
             Rpc.action('sync_wan').then(function() {
                 try {
                     ui.addNotification(t('Settings saved'),

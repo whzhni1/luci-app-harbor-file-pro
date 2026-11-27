@@ -4,8 +4,6 @@
 'require rpc';
 'require uci';
 
-/* Stamped from the Makefile at build time (Build/Prepare) — bump
-   PKG_VERSION/PKG_RELEASE in the Makefile only. */
 const ASSET_VERSION = '2.0.0-r23';
 const THEME_KEY = 'harbor-theme';
 

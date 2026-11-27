@@ -91,17 +91,23 @@ function doAction(action, area) {
 function showInitAccount() {
     var userInput = E('input', { 'class': 'cbi-input-text', 'type': 'text', 'autocomplete': 'off' });
     var passInput = E('input', { 'class': 'cbi-input-password', 'type': 'password', 'autocomplete': 'new-password' });
+    var confirmInput = E('input', { 'class': 'cbi-input-password', 'type': 'password', 'autocomplete': 'new-password' });
     var note = E('div', { 'class': 'harbor-meta' });
     var body = E('div', {}, [
         E('p', {}, t('Set the administrator account for the Harbor web panel.')),
         E('div', { 'class': 'cbi-value' }, [ E('label', { 'class': 'cbi-value-title' }, t('Username')), E('div', { 'class': 'cbi-value-field' }, userInput) ]),
         E('div', { 'class': 'cbi-value' }, [ E('label', { 'class': 'cbi-value-title' }, t('Password')), E('div', { 'class': 'cbi-value-field' }, passInput) ]),
+        E('div', { 'class': 'cbi-value' }, [ E('label', { 'class': 'cbi-value-title' }, t('Confirm password')), E('div', { 'class': 'cbi-value-field' }, confirmInput) ]),
         note,
         E('div', { 'class': 'right' }, [
             E('button', { 'class': 'btn', 'click': function() { ui.hideModal(); } }, t('Cancel')),
             ' ',
             E('button', { 'class': 'btn cbi-button cbi-button-action', 'click': function(ev) {
                 var btn = ev.currentTarget;
+                if (passInput.value !== confirmInput.value) {
+                    UI.note(note, 'err', t('Passwords do not match'));
+                    return;
+                }
                 btn.disabled = true;
                 UI.note(note, '', t('Initializing…'));
                 var started = Date.now();
@@ -326,10 +332,10 @@ function startUpdate(project) {
         if (!r || !r.ok) {
             refs.updateBtn.disabled = false;
             refs.checkBtn.disabled = false;
-            UI.note(refs.note, 'err', t('Failed to start update'));
+            UI.note(refs.note, 'err', r && r.error ? r.error : t('Failed to start update'));
             return;
         }
-        refs.taskId = r.task_id || '';
+        refs.taskId = r.task_id || r.job_id || '';
         pollUpdate(project);
     }).catch(function() {
         refs.updateBtn.disabled = false;

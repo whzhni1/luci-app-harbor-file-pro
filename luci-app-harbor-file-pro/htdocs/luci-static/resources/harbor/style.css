@@ -307,10 +307,7 @@ html[data-harbor-theme] body[data-page^="admin-system-harbor-file-pro"] .harbor-
 }
 
 
-/* ==== Host-theme (e.g. luci-theme-argon) compatibility ==== */
 
-/* Host themes style bare h2/h3 as full-width raised blocks; neutralize on
-   Harbor pages (same approach as luci-app-vnt2) for normal typography. */
 html[data-harbor-theme] body[data-page^="admin-system-harbor-file-pro"] .harbor-head h2 {
     background: none;
     background-image: none;
@@ -339,8 +336,6 @@ html[data-harbor-theme] body[data-page^="admin-system-harbor-file-pro"] .harbor-
     color: var(--harbor-text);
 }
 
-/* The page title bar is a glass strip from the same material as the cards
-   (Win11 frosted style) instead of bare text over the host page. */
 html[data-harbor-theme] body[data-page^="admin-system-harbor-file-pro"] .harbor-head {
     background: var(--harbor-card);
     color: var(--harbor-text);
@@ -352,8 +347,6 @@ html[data-harbor-theme] body[data-page^="admin-system-harbor-file-pro"] .harbor-
     margin-bottom: 16px;
 }
 
-/* Host themes give .cbi-section / [data-tab-title] panels a solid surface;
-   make them transparent so the frosted map card shows through. */
 html[data-harbor-theme] body[data-page^="admin-system-harbor-file-pro"] .harbor-settings .cbi-map .cbi-section,
 html[data-harbor-theme] body[data-page^="admin-system-harbor-file-pro"] .harbor-settings .cbi-map [data-tab-title] {
     background: transparent;
@@ -363,7 +356,6 @@ html[data-harbor-theme] body[data-page^="admin-system-harbor-file-pro"] .harbor-
     border-radius: 0;
 }
 
-/* ==== Icon action buttons (ghost style + micro animations) ==== */
 
 button.harbor-ib {
     position: relative;
@@ -425,7 +417,6 @@ html[data-harbor-theme="dark"]  button.harbor-ib.harbor-t-red:hover { background
 button.harbor-ib:active { transform: scale(.93); }
 button.harbor-ib[disabled], button.harbor-ib.is-busy { opacity: .45; pointer-events: none; }
 
-/* —— per-button micro animations —— */
 button.harbor-ib.harbor-anim-play:hover .harbor-icon { transform: translateX(2.5px) scale(1.06); }
 button.harbor-ib.harbor-anim-stop:hover .harbor-icon { transform: scale(.82); }
 button.harbor-ib.harbor-anim-stop:active .harbor-icon { transform: scale(.7); }
@@ -440,7 +431,6 @@ button.harbor-ib.harbor-anim-wiggle:hover .harbor-icon { animation: harbor-wiggl
     75% { transform: rotate(9deg); }
 }
 
-/* —— click ripple —— */
 button.harbor-ib .harbor-ripple-layer .harbor-ripple {
     position: absolute;
     border-radius: 50%;
@@ -456,7 +446,6 @@ button.harbor-ib .harbor-ripple-layer .harbor-ripple {
     to { transform: scale(2.6); opacity: 0; }
 }
 
-/* —— tooltip (icon-only buttons have no text) —— */
 button.harbor-ib[data-tip]::after {
     content: attr(data-tip);
     position: absolute;
@@ -493,7 +482,6 @@ button.harbor-ib[data-tip]:focus-visible::after {
     transform: translate(-50%, 0);
 }
 
-/* —— busy spinner —— */
 button.harbor-ib .harbor-spin {
     position: absolute;
     inset: 0;
@@ -511,7 +499,6 @@ button.harbor-ib .harbor-spin svg { width: 17px; height: 17px; animation: harbor
     to { transform: rotate(360deg); }
 }
 
-/* —— primary text button (kept-text actions like “Open web panel”) —— */
 button.harbor-btn-primary {
     display: inline-flex;
     align-items: center;
@@ -545,10 +532,6 @@ html[data-harbor-theme="dark"] button.harbor-btn-primary {
     box-shadow: 0 4px 12px rgba(84, 194, 232, .25);
 }
 
-/* ==== iOS-style capsule switch (replaces plain checkboxes) ====
-   The visual is drawn on the frame label (input#id + label[for=id] pair);
-   the input itself is hidden but keeps focus/checked semantics. This avoids
-   fighting luci-theme-argon's !important sizing on input[type=checkbox]. */
 
 html[data-harbor-theme] body[data-page^="admin-system-harbor-file-pro"] .cbi-checkbox > input[type="checkbox"] {
     position: absolute;

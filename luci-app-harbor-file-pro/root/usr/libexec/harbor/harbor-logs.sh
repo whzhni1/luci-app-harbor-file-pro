@@ -3,8 +3,6 @@
 LOG_DIR="${HARBOR_LOG_DIR:-/tmp/harbor-core-logs}"
 LOG_FILE="$LOG_DIR/service.log"
 CURSOR="$LOG_DIR/last-line"
-# Auto-clear threshold (300 KiB) and how often the size is re-checked
-# while lines are appended (every N lines).
 LIMIT="${HARBOR_LOG_LIMIT:-307200}"
 CHECK_EVERY="${HARBOR_LOG_CHECK_EVERY:-100}"
 case "$LIMIT" in ''|*[!0-9]*) LIMIT=307200 ;; esac
@@ -17,7 +15,6 @@ case "$1" in
     sync|clear) ;;
     *) exit 2 ;;
 esac
-# Only the newest logread line is used as a cursor. Clearing never affects other services.
 snapshot="$(mktemp "$LOG_DIR/snapshot.XXXXXX")" || exit 1
 trap 'rm -f "$snapshot" "$LOG_DIR/new.$$"' EXIT INT TERM
 logread -e harbor-core > "$snapshot" 2>/dev/null || true
@@ -36,11 +33,6 @@ if [ -n "$old" ]; then
 else
     cp "$snapshot" "$LOG_DIR/new.$$" || exit 1
 fi
-# Append in a single pass but re-check the file size every CHECK_EVERY
-# lines; the log is wiped as soon as it passes LIMIT so a burst never
-# grows /tmp without bound. Recording continues after a wipe so the
-# newest lines survive the rotation. (This replaces the old bulk append
-# with one end-of-run size check.)
 LC_ALL=C awk -v out="$LOG_FILE" -v base="$(wc -c < "$LOG_FILE")" \
     -v limit="$LIMIT" -v n="$CHECK_EVERY" '
 {

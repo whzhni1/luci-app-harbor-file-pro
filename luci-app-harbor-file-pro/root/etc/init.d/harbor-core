@@ -177,9 +177,6 @@ reload_service() {
 }
 
 service_triggers() {
-	# Any applied UCI change (LuCI "Save & Apply", /sbin/reload_config) rewrites
-	# the auto-update cron entry and re-syncs the WAN allow rule so both take
-	# effect immediately without a service restart.
 	procd_add_raw_trigger "config.change" 1000 /etc/init.d/harbor-core sync_cron
 	procd_add_raw_trigger "config.change" 1000 /etc/init.d/harbor-core sync_wan
 }

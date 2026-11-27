@@ -26,7 +26,7 @@ msgstr "账号"
 msgid "Action failed"
 msgstr "操作失败"
 
-msgid "Administrator account is not initialized yet. "
+msgid "Administrator account is not initialized yet."
 msgstr "管理员账号尚未初始化。"
 
 msgid "Advanced"
@@ -79,6 +79,9 @@ msgstr "分片大小（字节）"
 
 msgid "Common"
 msgstr "常用"
+
+msgid "Confirm password"
+msgstr "确认密码"
 
 msgid "Config file"
 msgstr "配置文件"
@@ -229,6 +232,9 @@ msgstr "面板地址"
 
 msgid "Password"
 msgstr "密码"
+
+msgid "Passwords do not match"
+msgstr "两次输入的密码不一致"
 
 msgid "Password must be 6–128 characters"
 msgstr "密码须为 6–128 个字符"
