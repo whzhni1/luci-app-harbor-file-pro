@@ -88,7 +88,6 @@ var HarborFormat = {
         var d = Math.floor(s / 86400), h = Math.floor(s % 86400 / 3600),
             m = Math.floor(s % 3600 / 60), sec = s % 60;
         function p(n) { return (n < 10 ? '0' : '') + n; }
-        /* %(days)s/%(clock)s glue is locale-controlled (zh: "3天02:15:40"). */
         return _('%(days)sd %(clock)s')
             .replace('%(days)s', d)
             .replace('%(clock)s', p(h) + ':' + p(m) + ':' + p(sec));
@@ -205,10 +204,6 @@ var HarborUI = {
         ]);
     },
 
-    /* form.js labels use for="widget.cbid.…" but widgets only carry
-       data-widget-id (never id), so audits flag "label for mismatch" on
-       every LuCI form page. Give those widgets the matching id, and wire
-       up our own bare labels too. */
     fixLabelTargets: function(root) {
         if (!root || !root.querySelectorAll) return;
         var i, j;
@@ -314,8 +309,6 @@ function themeLabel(mode) {
 
 function resolveTheme(mode) {
     if (mode === 'dark' || mode === 'light') return mode;
-    /* Follow the host theme (luci-theme-argon exposes data-argon-mode on the
-       html element) before the browser preference so Auto never clashes. */
     var host = document.documentElement.getAttribute('data-argon-mode');
     if (host === 'dark' || host === 'light') return host;
     return (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';

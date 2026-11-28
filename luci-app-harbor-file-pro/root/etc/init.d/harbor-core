@@ -57,29 +57,37 @@ num_or() {
 }
 
 sync_wan() {
-	local wan port cur changed=0
-	wan="$(cfg_or wan_access 0)"
+	local wan port
+	wan="$(uci -q get harbor_file_pro.main.wan_access 2>/dev/null)"
+	[ -z "$wan" ] && wan="$(cfg_or wan_access 0)"
 	port="$(cfg_or port 9700)"
-	cur="$(uci -q get firewall.harbor_wan.dest_port 2>/dev/null)"
+
+	uci -q delete firewall.harbor_wan 2>/dev/null
+	uci -q delete firewall.harbor_wan_drop 2>/dev/null
+
 	if [ "$wan" = "1" ]; then
-		if [ "$cur" != "$port" ] || [ "$(uci -q get firewall.harbor_wan.target 2>/dev/null)" != "ACCEPT" ]; then
-			uci set firewall.harbor_wan=rule
-			uci set firewall.harbor_wan.name='Harbor File Pro WAN'
-			uci set firewall.harbor_wan.src='wan'
-			uci set firewall.harbor_wan.proto='tcp'
-			uci set firewall.harbor_wan.dest_port="$port"
-			uci set firewall.harbor_wan.target='ACCEPT'
-			uci commit firewall
-			changed=1
-		fi
+		uci set firewall.harbor_wan=rule
+		uci set firewall.harbor_wan.name='Harbor File Pro WAN'
+		uci set firewall.harbor_wan.src='wan'
+		uci set firewall.harbor_wan.proto='tcp'
+		uci set firewall.harbor_wan.dest_port="$port"
+		uci set firewall.harbor_wan.target='ACCEPT'
 	else
-		if [ -n "$cur" ] || uci -q get firewall.harbor_wan >/dev/null 2>&1; then
-			uci -q delete firewall.harbor_wan
-			uci commit firewall
-			changed=1
-		fi
+		uci set firewall.harbor_wan_drop=rule
+		uci set firewall.harbor_wan_drop.name='Harbor File Pro WAN Deny'
+		uci set firewall.harbor_wan_drop.src='wan'
+		uci set firewall.harbor_wan_drop.proto='tcp'
+		uci set firewall.harbor_wan_drop.dest_port="$port"
+		uci set firewall.harbor_wan_drop.target='DROP'
 	fi
-	[ "$changed" = "1" ] && /etc/init.d/firewall reload >/dev/null 2>&1
+
+	uci commit firewall
+
+	if command -v fw4 >/dev/null 2>&1 && [ -f /var/run/fw4.state ]; then
+		fw4 -q reload >/dev/null 2>&1
+	else
+		/etc/init.d/firewall reload >/dev/null 2>&1
+	fi
 	return 0
 }
 
@@ -137,8 +145,7 @@ seed_config() {
 start_service() {
 	local prog state respawn_en respawn_th respawn_to respawn_re dev_mode
 	seed_config
-	sync_wan
-	sync_cron
+	( sync_wan; sync_cron ) >/dev/null 2>&1 &
 	is_enabled || return 0
 	prog="$(prog_path)"
 	state="$(state_dir)"
